@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/msal-react";
+import { loginRequest } from "./authConfig";
 
 // Set VITE_API_URL at build time (GitHub Actions secret/var) to the deployed
-// Function App's URL, e.g. https://aaf-factory-api-dev.azurewebsites.net
+// Function App's URL, e.g. https://credo-factory-api-dev.azurewebsites.net
 // Falls back to the local Azure Functions Core Tools port for `func start`.
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:7071";
 
@@ -14,6 +16,14 @@ type HealthResponse = {
 export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { instance } = useMsal();
+  const handleLogin = () => {
+    instance.loginPopup(loginRequest).catch((e) => console.error(e));
+  };
+
+  const handleLogout = () => {
+    instance.logoutPopup();
+  };
 
   useEffect(() => {
     fetch(`${API_URL}/api/health`)
@@ -45,6 +55,15 @@ export default function App() {
           {JSON.stringify(health, null, 2)}
         </pre>
       )}
+      <div>
+      <AuthenticatedTemplate>
+        <p>Signed in. Routing shell goes here next.</p>
+        <button onClick={handleLogout}>Sign out</button>
+      </AuthenticatedTemplate>
+      <UnauthenticatedTemplate>
+        <button onClick={handleLogin}>Sign in</button>
+      </UnauthenticatedTemplate>
+    </div>
     </main>
   );
 }

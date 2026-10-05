@@ -1,5 +1,5 @@
 {
-  "name": "aaf-factory-web",
+  "name": "credo-factory-web",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.24.0",
+    "@azure/msal-react": "^5.7.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
