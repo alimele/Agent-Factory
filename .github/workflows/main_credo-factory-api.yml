@@ -85,4 +85,5 @@ jobs:
           app-name: 'credo-factory-api'
           slot-name: 'Production'
           package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          remote-build: true
           
