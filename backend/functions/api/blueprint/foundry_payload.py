@@ -26,8 +26,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from blueprint_schema import AgentBlueprint
-from catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, MODEL_POLICIES
+from api.blueprint.blueprint_schema import AgentBlueprint
+from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, MODEL_POLICIES
 
 
 def _render_instructions(blueprint: AgentBlueprint) -> str:

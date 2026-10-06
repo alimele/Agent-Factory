@@ -40,7 +40,7 @@ from __future__ import annotations
 from typing import List, Literal, Type
 from pydantic import BaseModel, create_model
 
-from blueprint_schema import CatalogSnapshot
+from api.blueprint.blueprint_schema import CatalogSnapshot
 
 
 def _literal(values: List[str]):

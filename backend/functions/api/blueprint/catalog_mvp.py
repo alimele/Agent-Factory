@@ -9,7 +9,7 @@ etc). The *shape* is correct now; the ids are stubs so Phase 2 can be built
 and tested independently of Phase 4 provisioning.
 """
 
-from blueprint_schema import CatalogSnapshot
+from api.blueprint.blueprint_schema import CatalogSnapshot
 
 DEPARTMENTS = ["HR", "Finance", "Procurement", "IT", "Security", "Sales", "Operations"]
 

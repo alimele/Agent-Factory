@@ -14,10 +14,10 @@ A live end-to-end run (actually calling Stage 1 against your Foundry
 deployment) is in run_live_core_call() at the bottom, not run by default.
 """
 
-from blueprint_generator import build_core_draft_model
-from blueprint_compiler import compile_blueprint, CatalogValidationError
-from foundry_payload import to_foundry_agent_payload
-from catalog_mvp import mvp_catalog_snapshot, knowledge_sources_for_department, tools_for_department
+from api.blueprint.blueprint_generator import build_core_draft_model
+from api.blueprint.blueprint_compiler import compile_blueprint, CatalogValidationError
+from api.blueprint.foundry_payload import to_foundry_agent_payload
+from api.blueprint.catalog_mvp import mvp_catalog_snapshot, knowledge_sources_for_department, tools_for_department
 
 
 def check(label, condition):

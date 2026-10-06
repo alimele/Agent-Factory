@@ -16,8 +16,8 @@ from __future__ import annotations
 from typing import List
 from pydantic import BaseModel
 
-from blueprint_schema import AgentBlueprint
-from catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, AUDIENCES
+from api.blueprint.blueprint_schema import AgentBlueprint
+from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, AUDIENCES
 
 
 class CatalogValidationError(ValueError):
