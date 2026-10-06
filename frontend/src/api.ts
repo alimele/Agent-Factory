@@ -1,12 +1,10 @@
 import { IPublicClientApplication } from "@azure/msal-browser";
 import { apiRequest } from "./authConfig";
 
-// Point this at your actual Function App. Since the SPA calls it directly
-// (not through an SWA-linked proxy), set this via a Vite env var so it's
-// different in dev vs prod rather than hardcoded:
-//   .env.development -> VITE_API_BASE_URL=http://localhost:7071/api
-//   .env.production   -> VITE_API_BASE_URL=https://credo-factory-api.azurewebsites.net/api
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
+// Reuses the VITE_API_URL already set in frontend/.env.local (your Function
+// App's base URL, no path suffix) and appends /api here, rather than
+// requiring a second, differently-shaped env var.
+const API_BASE = `${import.meta.env.VITE_API_URL}/api`;
 
 async function getAccessToken(msalInstance: IPublicClientApplication): Promise<string> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
