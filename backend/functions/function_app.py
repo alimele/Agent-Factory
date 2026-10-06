@@ -28,6 +28,7 @@ from api.blueprint.catalog_mvp import (
     knowledge_sources_for_department,
     tools_for_department,
     DEPARTMENTS,
+    AUDIENCES,
 )
 from api.blueprint.auth import get_requester, UnauthenticatedError
 
@@ -112,6 +113,11 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
         "tools": [
             {"id": k, "displayName": v["display_name"], "risk": v.get("risk")} for k, v in tools.items()
         ],
+        # Not yet department-filtered (MVP: audiences aren't tagged to a
+        # department in catalog_mvp.py) — every requester sees the full
+        # audience list. Worth revisiting in Phase 3 alongside real
+        # permission-aware filtering.
+        "audiences": [{"id": k} for k in AUDIENCES.keys()],
     })
 
 

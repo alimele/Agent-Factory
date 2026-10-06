@@ -33,3 +33,7 @@ export const msalConfig: Configuration = {
 export const loginRequest = {
   scopes: ["User.Read"],
 };
+
+export const apiRequest = {
+  scopes: ["api://7ce78d8d-cb7c-4def-8d7c-b2bf4c8544ae/access_as_user"],
+};
