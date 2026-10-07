@@ -9,30 +9,7 @@ audience — those are picked by the user on their own catalog pages
 blueprint_compiler.py for Stage 3, which assembles the final AgentBlueprint
 once those manual picks exist.
 
-Uses the Foundry project's own OpenAI-compatible endpoint and the Responses
-API — matching the sample your Foundry project page gives you (model =
-your deployment name, not a bare model id):
-
-    from openai import OpenAI
-    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
-    endpoint = "https://<your-project>/openai/v1"
-    token_provider = get_bearer_token_provider(
-        DefaultAzureCredential(), "https://ai.azure.com/.default"
-    )
-    client = OpenAI(base_url=endpoint, api_key=token_provider)
-    response = client.responses.parse(model=deployment_name, input=..., text_format=SomeModel)
-
-Requires:
-    pip install -U openai pydantic azure-identity
-Env:
-    FOUNDRY_PROJECT_ENDPOINT   copy the exact base_url from your Foundry
-                               project's own code sample — don't hand-build
-                               it, the host format has changed before.
-    AZURE_OPENAI_DEPLOYMENT    the deployment name you chose in the portal, e.g. "gpt-5"
-Auth:
-    DefaultAzureCredential — run `az login` locally so it has something to
-    pick up. No API key is used or stored.
+Uses the Foundry project's own OpenAI-compatible endpoint and the Responses API to generate a CoreBlueprintDraft from the user's plain-language description.
 """
 
 from __future__ import annotations

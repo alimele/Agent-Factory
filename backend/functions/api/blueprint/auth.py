@@ -6,10 +6,6 @@ same mechanism) injecting the `x-ms-client-principal` header — base64-encoded
 JSON containing the Entra ID claims — into every request that reaches this
 Function once the user is logged in via the Phase 1 MSAL flow. We do NOT
 validate a JWT here ourselves; SWA/Easy Auth already did that in front of us.
-
-This only works when the Function is actually fronted by SWA or has Easy
-Auth turned on. For local `func start` testing, neither is present, so
-there's an explicit, opt-in-only local fallback below — never silently on.
 """
 
 from __future__ import annotations

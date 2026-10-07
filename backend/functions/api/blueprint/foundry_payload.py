@@ -16,10 +16,6 @@ Both tools and knowledge sources are optional and independent:
   knowledge tools (file_search / azure_ai_search are themselves Foundry
   tools) — they are two different concepts in our blueprint, but merge
   into one Foundry "tools" array.
-
-This module deliberately does not call Foundry — it only builds the dict,
-so it can be unit-tested without network/auth, and Phase 4 just does
-`client.agents.create(**payload)` (or the REST equivalent) with the result.
 """
 
 from __future__ import annotations

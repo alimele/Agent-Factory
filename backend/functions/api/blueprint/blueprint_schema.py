@@ -1,20 +1,5 @@
 """
-AAF Agent Blueprint — the governance-rich object the NLP layer produces.
-
-Design rule (ties to the Governance Gate in the project plan, section 6):
-the NLP model NEVER emits a raw Foundry tool/connector definition. It only
-ever picks catalog IDs (strings) from the approved catalog it was shown.
-The *catalog* — not the model — holds the actual Foundry-shape fragments
-(tool type, tool_resources, OpenAPI spec refs, connection ids). Resolution
-from blueprint -> real Foundry payload happens in foundry_payload.py,
-deterministically, in code. This is what makes "cannot invent connectors
-or permissions" (plan section 5) actually true rather than aspirational.
-
-knowledgeSources and tools are both optional and independently so:
-- a pure Knowledge Assistant may have knowledgeSources but tools=[]
-- a pure Process/Action agent may have tools but knowledgeSources=[]
-- a template/boilerplate agent could technically have neither, though the
-  Review page should flag that as unusual rather than block it.
+CREDO Agent Blueprint — the governance-rich object the NLP layer produces.
 """
 
 from __future__ import annotations

@@ -1,12 +1,5 @@
 """
-Place this file at the ROOT of your Functions project (same level as
-host.json/requirements.txt) — Python v2 Functions looks for function_app.py
-there by default. Your existing modules stay where they are, at
-api/blueprint/*.py; this file just imports them.
-
-If you used the older function.json-based model in Phase 0 instead of the
-v2 decorator model, say so and I'll restructure this into that shape
-instead — the three handlers' bodies stay the same either way.
+This is the Azure Functions entrypoint for the Blueprint API.
 
 Routes:
   POST /api/blueprint/core                -> Stage 1 (Describe page)
@@ -31,9 +24,11 @@ from api.blueprint.catalog_mvp import (
     AUDIENCES,
 )
 from api.blueprint.auth import get_requester, UnauthenticatedError
+from api.policy.routes import bp as policy_bp
 
 app = func.FunctionApp()
 
+app.register_functions(policy_bp)
 
 def _json_response(body: dict, status_code: int = 200) -> func.HttpResponse:
     return func.HttpResponse(json.dumps(body), status_code=status_code, mimetype="application/json")
