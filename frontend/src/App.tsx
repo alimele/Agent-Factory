@@ -2,8 +2,7 @@ import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/
 import { RouterProvider } from "react-router-dom";
 import { loginRequest } from "./authConfig";
 import { router } from "./router";
-import { BlueprintProvider } from "./BlueprintContext"
-import { callPolicyEvaluate } from "./callPolicyEvaluate";
+import { BlueprintProvider } from "./BlueprintContext";
 import { useEffect } from "react";
 
 export default function App() {
@@ -14,35 +13,16 @@ export default function App() {
   };
 
   useEffect(() => {
-  if (!instance.getActiveAccount() && accounts.length > 0) {
-    instance.setActiveAccount(accounts[0]);
-  }
-}, [instance, accounts]);
-
-  async function handleTestPolicyEvaluate() {
-  const sampleBlueprint = {
-    department: "Admin",
-    modelPolicy: "approved-general-enterprise",
-    knowledgeSources: [], tools: [],
-    dataClassification: "Internal",
-    humanApproval: false, externalSharing: false,
-    owner: "ali@test.com", reviewPeriodDays: 180,
-  };
-
-  try {
-    const res = await callPolicyEvaluate(instance, { blueprint: sampleBlueprint, stage: "pre_deploy" });
-    console.log("Policy evaluation result:", res);
-  } catch (err) {
-    console.error("Policy evaluate failed:", err);
-  }
-}
+    if (!instance.getActiveAccount() && accounts.length > 0) {
+      instance.setActiveAccount(accounts[0]);
+    }
+  }, [instance, accounts]);
 
   return (
     <>
       <AuthenticatedTemplate>
-        <button onClick={handleTestPolicyEvaluate}>Test Policy Evaluate</button>
         <BlueprintProvider>
-        <RouterProvider router={router} />
+          <RouterProvider router={router} />
         </BlueprintProvider>
       </AuthenticatedTemplate>
       <UnauthenticatedTemplate>
