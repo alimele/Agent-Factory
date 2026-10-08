@@ -9,13 +9,12 @@ a normal result, not an exception. Only genuine bad input should raise.
 from api.policy.catalogs import approved_knowledge_ids, approved_tool_ids, unapproved
 from api.policy.models import CheckResult, CheckStatus, EvalContext, Stage
 
-RESTRICTED_DATA_CLASSES = {"Restricted"}
-SENSITIVE_DATA_CLASSES = {"Confidential", "HR-Sensitive", "Financial", "Security"}
+RESTRICTED_DATA_CLASSES = {"Security-Restricted"}
+SENSITIVE_DATA_CLASSES = {"Confidential", "HR-Sensitive", "Financial"}
 WRITE_ACTION_HINTS = ("create", "update", "delete", "approve", "transfer", "send")
 
 
 def check_identity(bp: dict, ctx: EvalContext) -> CheckResult:
-    # TODO: replace with a real Entra group / role lookup once wired.
     ok = bool(ctx.requester_id)
     return CheckResult(id="identity", name="Identity",
                         status=CheckStatus.PASS if ok else CheckStatus.FAIL,
@@ -23,8 +22,6 @@ def check_identity(bp: dict, ctx: EvalContext) -> CheckResult:
 
 
 def check_department(bp: dict, ctx: EvalContext) -> CheckResult:
-    # TODO: compare ctx.requester_department / ctx.requester_groups against
-    # bp["department"] once group-to-department mapping exists.
     if ctx.requester_department is None:
         return CheckResult(id="department", name="Department", status=CheckStatus.SKIPPED,
                             reason="Requester department not wired yet")

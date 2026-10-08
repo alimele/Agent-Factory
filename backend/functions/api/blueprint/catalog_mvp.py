@@ -11,7 +11,7 @@ and tested independently of Phase 4 provisioning.
 
 from api.blueprint.blueprint_schema import CatalogSnapshot
 
-DEPARTMENTS = ["HR", "Finance", "Procurement", "IT", "Security", "Sales", "Operations"]
+DEPARTMENTS = ["HR", "Finance", "DevSecOps", "IT Support", "Admin", "Sales"]
 
 AGENT_TYPES = [
     "Knowledge Assistant", "Analyst", "Process Agent", "Action Agent", "Monitoring Agent",

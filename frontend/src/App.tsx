@@ -21,7 +21,7 @@ export default function App() {
 
   async function handleTestPolicyEvaluate() {
   const sampleBlueprint = {
-    department: "Finance",
+    department: "Admin",
     modelPolicy: "approved-general-enterprise",
     knowledgeSources: [], tools: [],
     dataClassification: "Internal",

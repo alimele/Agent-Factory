@@ -34,10 +34,10 @@ def _risk_tier(bp: dict, checks: list[CheckResult]) -> RiskTier:
     data_status = by_id["data"].status
     actions_status = by_id["actions"].status
 
-    if data_status == CheckStatus.FAIL or bp.get("dataClassification") == "Restricted":
+    if data_status == CheckStatus.FAIL or bp.get("dataClassification") == "Security-Restricted":
         return RiskTier.RESTRICTED
     if data_status == CheckStatus.FLAGGED or actions_status == CheckStatus.FLAGGED:
-        if bp.get("dataClassification") in ("HR-Sensitive", "Financial", "Security"):
+        if bp.get("dataClassification") in ("HR-Sensitive", "Financial"):
             return RiskTier.HIGH
         return RiskTier.MEDIUM
     if data_status == CheckStatus.PASS and actions_status == CheckStatus.PASS:
