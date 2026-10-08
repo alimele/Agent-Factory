@@ -39,7 +39,7 @@ AUDIENCES = {
     "All-Employees": {"entra_group_id": "TODO-group-id-all-employees"},
     "HR-Team": {"entra_group_id": "TODO-group-id-hr"},
     "Finance-Team": {"entra_group_id": "TODO-group-id-finance"},
-    "IT-Team": {"entra_group_id": "TODO-group-id-it"},
+    "IT-Support-Team": {"entra_group_id": "TODO-group-id-it-support"},
 }
 
 # Knowledge sources resolve to a file_search or azure_ai_search Foundry tool.
@@ -52,18 +52,24 @@ KNOWLEDGE_CATALOG = {
         "tool_resource": {"file_search": {"vector_store_ids": ["TODO-vector-store-id-hr-leave"]}},
     },
     "Finance-SharePoint-Policies": {
-        "display_name": "Finance SharePoint — Expense & Procurement Policies",
-        "department": ["Finance", "Procurement"],
+        "display_name": "Finance SharePoint Policies",
+        "department": ["Finance"],
         "data_classification": "Internal",
         "foundry_tool_type": "file_search",
         "tool_resource": {"file_search": {"vector_store_ids": ["TODO-vector-store-id-finance-policies"]}},
     },
-    "IT-KB-Confluence": {
+    "IT-KB-AzureSearch": {
         "display_name": "IT Knowledge Base",
-        "department": ["IT"],
+        "department": ["IT Support"],
         "data_classification": "Internal",
-        "foundry_tool_type": "azure_ai_search",
-        "tool_resource": {"azure_ai_search": {"indexes": [{"index_connection_id": "TODO-aisearch-connection-it-kb", "index_name": "it-kb"}]}},
+        "foundry_tool_type": "foundry_iq",
+        "tool_resource": {
+            "knowledge_base": {
+                "name": "knowledgebase107",
+                "knowledge_source": "ks-searchindex-458",
+                "search_service" : "alimele2378-0871-srch-65s4",
+                "index_name": "rag-1790607218889"
+                }},
     },
 }
 
@@ -85,7 +91,7 @@ TOOL_CATALOG = {
     },
     "ServiceNow-Create-IT-Ticket": {
         "display_name": "Create ServiceNow IT Ticket",
-        "department": ["IT"],
+        "department": ["IT Support"],
         "risk": "low",
         "foundry_tool": {
             "type": "openapi",
@@ -99,7 +105,7 @@ TOOL_CATALOG = {
     },
     "Outlook-Send-Notification": {
         "display_name": "Send Outlook Notification",
-        "department": ["HR", "Finance", "IT", "Operations"],
+        "department": ["HR", "Finance", "IT Support", "Operations"],
         "risk": "low",
         "foundry_tool": {
             "type": "openapi",
