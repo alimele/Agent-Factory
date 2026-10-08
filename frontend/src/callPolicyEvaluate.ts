@@ -1,13 +1,13 @@
 // Call this instead of putting "requester" in the JSON body — the
 // access token now carries identity + department (via the roles claim).
 
-import { PublicClientApplication } from "@azure/msal-browser";
+import { IPublicClientApplication } from "@azure/msal-browser";
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 const API_SCOPE = import.meta.env.VITE_API_SCOPE;
 
 export async function callPolicyEvaluate(
-  msalInstance: PublicClientApplication,
+  msalInstance: IPublicClientApplication,
   body: { blueprint: object; stage: "pre_deploy" | "pre_publish"; testResults?: object; blueprintId?: string }
 ) {
   const account = msalInstance.getActiveAccount();
