@@ -13,7 +13,7 @@ from api.policy.identity import build_context, TokenError
 bp = func.Blueprint()
 
 
-@bp.route(route="policy/evaluate", methods=["POST"])
+@bp.route(route="policy/evaluate", methods=["POST"],auth_level=func.AuthLevel.ANONYMOUS)
 def evaluate_policy(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()

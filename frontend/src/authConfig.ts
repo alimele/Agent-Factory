@@ -3,7 +3,7 @@ import { Configuration, LogLevel } from "@azure/msal-browser";
 export const msalConfig: Configuration = {
   auth: {
     clientId: "7ce78d8d-cb7c-4def-8d7c-b2bf4c8544ae", // Application (client) ID from CREDO-Factory-Dev
-    authority: "https://login.microsoftonline.com/09c33f4e-3945-4c36-896d-35ec9632e7a1/v2.0",
+    authority: "https://login.microsoftonline.com/09c33f4e-3945-4c36-896d-35ec9632e7a1",
     redirectUri: window.location.origin, // auto-resolves to localhost in dev, your SWA URL in prod
     postLogoutRedirectUri: window.location.origin,
   },
