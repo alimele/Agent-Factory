@@ -22,6 +22,13 @@ interface BlueprintState {
 
   compileResult: CompileResponse | null;
   setCompileResult: (v: CompileResponse | null) => void;
+
+  // NEW: set once Submit's approval flow has actually created the agent.
+  // Gates the Lifecycle page in Layout. Still a plain flag here because
+  // Phase 4 (real Foundry agent creation) isn't built yet — Submit should
+  // set this to true once that call succeeds.
+  agentCreated: boolean;
+  setAgentCreated: (v: boolean) => void;
 }
 
 const BlueprintContext = createContext<BlueprintState | undefined>(undefined);
@@ -34,6 +41,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
+  const [agentCreated, setAgentCreated] = useState(false);
 
   return (
     <BlueprintContext.Provider
@@ -45,6 +53,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
         selectedToolIds, setSelectedToolIds,
         selectedAudienceIds, setSelectedAudienceIds,
         compileResult, setCompileResult,
+        agentCreated, setAgentCreated,
       }}
     >
       {children}

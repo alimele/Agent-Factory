@@ -1,5 +1,7 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
+import { useBlueprint } from "./BlueprintContext";
+import "./theme.css";
 
 const pages = [
   { path: "describe", label: "Describe" },
@@ -14,25 +16,72 @@ const pages = [
   { path: "lifecycle", label: "Lifecycle" },
 ];
 
+// Gating rule: Describe is always open. Context..Review unlock once the
+// core blueprint draft exists (Describe submitted). Test & Submit unlock
+// once the blueprint has been compiled on Review. Lifecycle unlocks only
+// once the agent has actually been created (post-approval).
+function isUnlocked(
+  path: string,
+  hasCoreDraft: boolean,
+  hasCompiled: boolean,
+  agentCreated: boolean
+) {
+  if (path === "describe") return true;
+  if (["context", "knowledge", "tools", "behavior", "security", "review"].includes(path)) {
+    return hasCoreDraft;
+  }
+  if (path === "test" || path === "submit") return hasCompiled;
+  if (path === "lifecycle") return agentCreated;
+  return false;
+}
+
 export default function Layout() {
   const { instance } = useMsal();
+  const { coreDraft, compileResult, agentCreated } = useBlueprint();
+  const location = useLocation();
+  const currentIndex = pages.findIndex((p) => location.pathname.includes(p.path));
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <nav style={{ width: 200, padding: "1rem", borderRight: "1px solid #ddd" }}>
-        <h3>AAF Factory</h3>
-        {pages.map((p) => (
-          <div key={p.path} style={{ margin: "0.5rem 0" }}>
-            <NavLink to={p.path}>{p.label}</NavLink>
+    <div className="app">
+      <header className="top">
+        <div className="brand">
+          <div className="logo">C</div>
+          <div><b>Credo Agent Factory</b><small>Governed agent builder</small></div>
+        </div>
+        <button className="btn" onClick={() => instance.logoutRedirect()}>Sign out</button>
+      </header>
+      <div className="layout">
+        <nav className="side">
+          <div className="sideTitle">Create agent</div>
+          <div className="steps">
+            {pages.map((p, i) => {
+              const unlocked = isUnlocked(p.path, !!coreDraft, !!compileResult, agentCreated);
+              const done = unlocked && i < currentIndex;
+              return (
+                <NavLink
+                  key={p.path}
+                  to={unlocked ? `/${p.path}` : location.pathname}
+                  onClick={(e) => { if (!unlocked) e.preventDefault(); }}
+                  className={({ isActive }) =>
+                    "step" + (isActive ? " active" : "") + (done ? " done" : "") + (!unlocked ? " locked" : "")
+                  }
+                >
+                  <div className="num">{done ? "✓" : i + 1}</div>
+                  <div>
+                    <strong>{p.label}</strong>
+                    {!unlocked && <span>Locked</span>}
+                  </div>
+                </NavLink>
+              );
+            })}
           </div>
-        ))}
-        <button onClick={() => instance.logoutRedirect()} style={{ marginTop: "1rem" }}>
-          Sign out
-        </button>
-      </nav>
-      <main style={{ flex: 1, padding: "2rem" }}>
-        <Outlet />
-      </main>
+        </nav>
+        <main className="main">
+          <div className="content">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

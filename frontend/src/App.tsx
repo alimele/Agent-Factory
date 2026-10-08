@@ -4,13 +4,21 @@ import { loginRequest } from "./authConfig";
 import { router } from "./router";
 import { BlueprintProvider } from "./BlueprintContext"
 import { callPolicyEvaluate } from "./callPolicyEvaluate";
+import { useEffect } from "react";
 
 export default function App() {
-  const { instance } = useMsal();
+  const { instance, accounts } = useMsal();
 
   const handleLogin = () => {
     instance.loginRedirect(loginRequest).catch((e) => console.error(e));
   };
+
+  useEffect(() => {
+  if (!instance.getActiveAccount() && accounts.length > 0) {
+    instance.setActiveAccount(accounts[0]);
+  }
+}, [instance, accounts]);
+
   async function handleTestPolicyEvaluate() {
   const sampleBlueprint = {
     department: "Finance",
