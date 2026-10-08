@@ -34,6 +34,7 @@ jobs:
           ###### End of Repository/Build Configurations ######
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_SCOPE: ${{ secrets.VITE_API_SCOPE }}
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
