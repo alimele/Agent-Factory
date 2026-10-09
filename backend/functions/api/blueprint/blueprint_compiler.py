@@ -1,14 +1,5 @@
 """
-Stage 3 of 3 — Review page.
-
-No model call here at all — by the time the user reaches Review, every
-field already has a value (Stage 1 generated the core fields, Stage 2 was
-the user manually picking from catalog pages). This module's only job is to
-assemble those into the final AgentBlueprint and reject anything that
-doesn't check out against the real catalog — this is the important part,
-since knowledgeSources/tools/audience are no longer constrained by a
-schema the model was forced into; they came from a web form, so they get
-validated here instead, server-side, before anything is trusted.
+Blueprint compiler
 """
 
 from __future__ import annotations
@@ -17,7 +8,8 @@ from typing import List
 from pydantic import BaseModel
 
 from api.blueprint.blueprint_schema import AgentBlueprint
-from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, AUDIENCES
+from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, AUDIENCES
+from api.blueprint.api_center_catalog import tools_for_department
 
 
 class CatalogValidationError(ValueError):
@@ -42,7 +34,7 @@ def compile_blueprint(
     review_period_days: int = 180,
 ) -> AgentBlueprint:
     _validate_ids(knowledge_source_ids, KNOWLEDGE_CATALOG, "knowledge source")
-    _validate_ids(tool_ids, TOOL_CATALOG, "tool")
+    _validate_ids(tool_ids, tools_for_department(core_draft.department), "tool")
     _validate_ids(audience_ids, AUDIENCES, "audience")
 
     return AgentBlueprint(

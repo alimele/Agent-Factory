@@ -2,3 +2,4 @@ azure-functions
 pydantic
 openai
 azure-identity
+azure-mgmt-apicenter

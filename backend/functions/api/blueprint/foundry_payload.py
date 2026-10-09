@@ -1,21 +1,5 @@
 """
 AgentBlueprint -> Foundry agent-creation payload.
-
-Matches the Foundry Agent Service create-agent shape (per Microsoft's own
-docs/SDK): name, model, instructions, tools (list, may be empty),
-tool_resources (dict, may be {}), metadata (free-form dict — this is where
-our governance fields ride along so they're visible on the agent record
-itself, not just in our own database).
-
-Both tools and knowledge sources are optional and independent:
-- knowledgeSources=[] and tools=[] with a plain instructions-only agent
-  is valid (a pure prompt agent, no grounding, no actions)
-- only one of the two populated is the common case (Knowledge Assistant
-  vs. Action/Process agent)
-- "tools" in the OUTPUT Foundry payload can contain BOTH action tools and
-  knowledge tools (file_search / azure_ai_search are themselves Foundry
-  tools) — they are two different concepts in our blueprint, but merge
-  into one Foundry "tools" array.
 """
 
 from __future__ import annotations
@@ -23,7 +7,8 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from api.blueprint.blueprint_schema import AgentBlueprint
-from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, TOOL_CATALOG, MODEL_POLICIES
+from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, MODEL_POLICIES
+from api.blueprint.api_center_catalog import get_foundry_tool
 
 
 def _render_instructions(blueprint: AgentBlueprint) -> str:
@@ -82,8 +67,7 @@ def to_foundry_agent_payload(blueprint: AgentBlueprint) -> Dict[str, Any]:
 
     # Action tools pass through from the catalog as-is (already Foundry-shaped)
     for tool_id in blueprint.tools:
-        entry = TOOL_CATALOG[tool_id]
-        tools.append(entry["foundry_tool"])
+        tools.append(get_foundry_tool(tool_id))
 
     # Knowledge sources resolve + merge into file_search / azure_ai_search tools
     if blueprint.knowledgeSources:
@@ -98,16 +82,16 @@ def to_foundry_agent_payload(blueprint: AgentBlueprint) -> Dict[str, Any]:
         "tools": tools,                 # [] is valid — e.g. a pure Q&A agent with no file_search either
         "tool_resources": tool_resources,  # {} is valid when tools is []
         "metadata": {
-            "aaf_department": blueprint.department,
-            "aaf_agent_type": blueprint.agentType,
-            "aaf_pattern": blueprint.pattern,
-            "aaf_owner": blueprint.owner,
-            "aaf_data_classification": blueprint.dataClassification,
-            "aaf_human_approval_required": str(blueprint.humanApproval),
-            "aaf_external_sharing": str(blueprint.externalSharing),
-            "aaf_audience": ",".join(blueprint.audience),
-            "aaf_review_period_days": str(blueprint.reviewPeriodDays),
-            "aaf_blueprint_version": blueprint.blueprintVersion,
+            "credo_department": blueprint.department,
+            "credo_agent_type": blueprint.agentType,
+            "credo_pattern": blueprint.pattern,
+            "credo_owner": blueprint.owner,
+            "credo_data_classification": blueprint.dataClassification,
+            "credo_human_approval_required": str(blueprint.humanApproval),
+            "credo_external_sharing": str(blueprint.externalSharing),
+            "credo_audience": ",".join(blueprint.audience),
+            "credo_review_period_days": str(blueprint.reviewPeriodDays),
+            "credo_blueprint_version": blueprint.blueprintVersion,
         },
     }
     return payload

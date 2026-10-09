@@ -1,15 +1,10 @@
 """
 MVP catalogs — 5-10 tools, a handful of knowledge sources, matching the
 "5-8 agent templates / 5-10 tools" MVP scope in the project plan (section 9).
-
-TODO before Phase 4: replace the placeholder `tool_resource` / `foundry_tool`
-values below with real Azure resource ids once they're provisioned
-(vector store ids for AI Search indexes, APIM/connection ids for ServiceNow
-etc). The *shape* is correct now; the ids are stubs so Phase 2 can be built
-and tested independently of Phase 4 provisioning.
 """
 
 from api.blueprint.blueprint_schema import CatalogSnapshot
+from api.blueprint.api_center_catalog import tools_for_department
 
 DEPARTMENTS = ["HR", "Finance", "DevSecOps", "IT Support", "Admin", "Sales"]
 
@@ -73,77 +68,20 @@ KNOWLEDGE_CATALOG = {
     },
 }
 
-# Action tools resolve to a function / openapi / built-in Foundry tool.
-TOOL_CATALOG = {
-    "ServiceNow-Create-HR-Request": {
-        "display_name": "Create ServiceNow HR Request",
-        "department": ["HR"],
-        "risk": "medium",
-        "foundry_tool": {
-            "type": "openapi",
-            "openapi": {
-                "name": "servicenow_create_hr_request",
-                "description": "Create a ServiceNow HR support ticket on behalf of an employee",
-                "spec_ref": "TODO-path-or-url-to-openapi-spec.json",
-                "auth": {"type": "connection", "connection_id": "TODO-apim-connection-id-servicenow"},
-            },
-        },
-    },
-    "ServiceNow-Create-IT-Ticket": {
-        "display_name": "Create ServiceNow IT Ticket",
-        "department": ["IT Support"],
-        "risk": "low",
-        "foundry_tool": {
-            "type": "openapi",
-            "openapi": {
-                "name": "servicenow_create_it_ticket",
-                "description": "Create a ServiceNow IT ticket",
-                "spec_ref": "TODO-path-or-url-to-openapi-spec.json",
-                "auth": {"type": "connection", "connection_id": "TODO-apim-connection-id-servicenow"},
-            },
-        },
-    },
-    "Outlook-Send-Notification": {
-        "display_name": "Send Outlook Notification",
-        "department": ["HR", "Finance", "IT Support", "Operations"],
-        "risk": "low",
-        "foundry_tool": {
-            "type": "openapi",
-            "openapi": {
-                "name": "send_outlook_notification",
-                "description": "Send a notification email via Outlook/Graph on behalf of the agent's service account",
-                "spec_ref": "TODO-path-or-url-to-graph-mail-spec.json",
-                "auth": {"type": "connection", "connection_id": "TODO-graph-connection-id"},
-            },
-        },
-    },
-}
-
-
 def knowledge_sources_for_department(department: str) -> dict:
     """Stage 2 (Knowledge page): what to show the user, pre-filtered by the
     department Stage 1 already determined. Pure lookup, no model involved."""
     return {k: v for k, v in KNOWLEDGE_CATALOG.items() if department in v["department"]}
 
 
-def tools_for_department(department: str) -> dict:
-    """Stage 2 (Actions page): same idea, for the tool catalog."""
-    return {k: v for k, v in TOOL_CATALOG.items() if department in v["department"]}
-
-
 def mvp_catalog_snapshot() -> CatalogSnapshot:
-    """
-    For Phase 2 MVP: the full static catalog, unfiltered. Swap this out in
-    Phase 3 for a function that filters by the requester's Entra groups /
-    department before the blueprint generator ever sees it.
-    """
     return CatalogSnapshot(
         departments=DEPARTMENTS,
         agent_types=AGENT_TYPES,
         patterns=PATTERNS,
         model_policies=list(MODEL_POLICIES.keys()),
         knowledge_source_ids=list(KNOWLEDGE_CATALOG.keys()),
-        tool_ids=list(TOOL_CATALOG.keys()),
+        tool_ids=[],
         audience_ids=list(AUDIENCES.keys()),
         data_classifications=DATA_CLASSIFICATIONS,
         channels=CHANNELS,
