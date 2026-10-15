@@ -8,8 +8,9 @@ from typing import List
 from pydantic import BaseModel
 
 from api.blueprint.blueprint_schema import AgentBlueprint
-from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, AUDIENCES
+from api.blueprint.catalog_mvp import AUDIENCES
 from api.blueprint.api_center_catalog import tools_for_department
+from api.blueprint.knowledge_registry import knowledge_sources_for_department
 
 
 class CatalogValidationError(ValueError):
@@ -33,7 +34,7 @@ def compile_blueprint(
     channels: List[str] | None = None,
     review_period_days: int = 180,
 ) -> AgentBlueprint:
-    _validate_ids(knowledge_source_ids, KNOWLEDGE_CATALOG, "knowledge source")
+    _validate_ids(knowledge_source_ids, knowledge_sources_for_department(core_draft.department), "knowledge source")
     _validate_ids(tool_ids, tools_for_department(core_draft.department), "tool")
     _validate_ids(audience_ids, AUDIENCES, "audience")
 

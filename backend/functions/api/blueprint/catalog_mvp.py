@@ -5,6 +5,7 @@ MVP catalogs — 5-10 tools, a handful of knowledge sources, matching the
 
 from api.blueprint.blueprint_schema import CatalogSnapshot
 from api.blueprint.api_center_catalog import tools_for_department
+from api.blueprint.knowledge_registry import knowledge_sources_for_department  # re-export
 
 DEPARTMENTS = ["HR", "Finance", "DevSecOps", "IT Support", "Admin", "Sales"]
 
@@ -37,50 +38,13 @@ AUDIENCES = {
     "IT-Support-Team": {"entra_group_id": "TODO-group-id-it-support"},
 }
 
-# Knowledge sources resolve to a file_search or azure_ai_search Foundry tool.
-KNOWLEDGE_CATALOG = {
-    "HR-SharePoint-Leave": {
-        "display_name": "HR SharePoint — Leave Policies",
-        "department": ["HR"],
-        "data_classification": "HR-Sensitive",
-        "foundry_tool_type": "file_search",
-        "tool_resource": {"file_search": {"vector_store_ids": ["TODO-vector-store-id-hr-leave"]}},
-    },
-    "Finance-SharePoint-Policies": {
-        "display_name": "Finance SharePoint Policies",
-        "department": ["Finance"],
-        "data_classification": "Internal",
-        "foundry_tool_type": "file_search",
-        "tool_resource": {"file_search": {"vector_store_ids": ["TODO-vector-store-id-finance-policies"]}},
-    },
-    "IT-KB-AzureSearch": {
-        "display_name": "IT Knowledge Base",
-        "department": ["IT Support"],
-        "data_classification": "Internal",
-        "foundry_tool_type": "foundry_iq",
-        "tool_resource": {
-            "knowledge_base": {
-                "name": "knowledgebase107",
-                "knowledge_source": "ks-searchindex-458",
-                "search_service" : "alimele2378-0871-srch-65s4",
-                "index_name": "rag-1790607218889"
-                }},
-    },
-}
-
-def knowledge_sources_for_department(department: str) -> dict:
-    """Stage 2 (Knowledge page): what to show the user, pre-filtered by the
-    department Stage 1 already determined. Pure lookup, no model involved."""
-    return {k: v for k, v in KNOWLEDGE_CATALOG.items() if department in v["department"]}
-
-
 def mvp_catalog_snapshot() -> CatalogSnapshot:
     return CatalogSnapshot(
         departments=DEPARTMENTS,
         agent_types=AGENT_TYPES,
         patterns=PATTERNS,
         model_policies=list(MODEL_POLICIES.keys()),
-        knowledge_source_ids=list(KNOWLEDGE_CATALOG.keys()),
+        knowledge_source_ids=[],
         tool_ids=[],
         audience_ids=list(AUDIENCES.keys()),
         data_classifications=DATA_CLASSIFICATIONS,

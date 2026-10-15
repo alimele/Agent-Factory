@@ -1,32 +1,39 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { CoreBlueprintDraft, CatalogResponse, CompileResponse } from "./api";
 
+export interface BehaviorPreferences {
+  instructions: string;
+  responseStyle: "Concise" | "Balanced" | "Detailed";
+  citeSources: boolean;
+  askClarifyingQuestions: boolean;
+  escalateUncertainty: boolean;
+}
+
+const defaultBehavior: BehaviorPreferences = {
+  instructions: "Use approved enterprise sources. Be accurate, explain uncertainty, and do not invent facts.",
+  responseStyle: "Balanced",
+  citeSources: true,
+  askClarifyingQuestions: true,
+  escalateUncertainty: true,
+};
+
 interface BlueprintState {
   description: string;
   setDescription: (v: string) => void;
-
   coreDraft: CoreBlueprintDraft | null;
   setCoreDraft: (v: CoreBlueprintDraft | null) => void;
-
   catalog: CatalogResponse | null;
   setCatalog: (v: CatalogResponse | null) => void;
-
   selectedKnowledgeIds: string[];
   setSelectedKnowledgeIds: (v: string[]) => void;
-
   selectedToolIds: string[];
   setSelectedToolIds: (v: string[]) => void;
-
   selectedAudienceIds: string[];
   setSelectedAudienceIds: (v: string[]) => void;
-
+  behavior: BehaviorPreferences;
+  setBehavior: (v: BehaviorPreferences) => void;
   compileResult: CompileResponse | null;
   setCompileResult: (v: CompileResponse | null) => void;
-
-  // NEW: set once Submit's approval flow has actually created the agent.
-  // Gates the Lifecycle page in Layout. Still a plain flag here because
-  // Phase 4 (real Foundry agent creation) isn't built yet — Submit should
-  // set this to true once that call succeeds.
   agentCreated: boolean;
   setAgentCreated: (v: boolean) => void;
 }
@@ -40,22 +47,17 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>([]);
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
+  const [behavior, setBehavior] = useState<BehaviorPreferences>(defaultBehavior);
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
   const [agentCreated, setAgentCreated] = useState(false);
 
   return (
-    <BlueprintContext.Provider
-      value={{
-        description, setDescription,
-        coreDraft, setCoreDraft,
-        catalog, setCatalog,
-        selectedKnowledgeIds, setSelectedKnowledgeIds,
-        selectedToolIds, setSelectedToolIds,
-        selectedAudienceIds, setSelectedAudienceIds,
-        compileResult, setCompileResult,
-        agentCreated, setAgentCreated,
-      }}
-    >
+    <BlueprintContext.Provider value={{
+      description, setDescription, coreDraft, setCoreDraft, catalog, setCatalog,
+      selectedKnowledgeIds, setSelectedKnowledgeIds, selectedToolIds, setSelectedToolIds,
+      selectedAudienceIds, setSelectedAudienceIds, behavior, setBehavior,
+      compileResult, setCompileResult, agentCreated, setAgentCreated,
+    }}>
       {children}
     </BlueprintContext.Provider>
   );

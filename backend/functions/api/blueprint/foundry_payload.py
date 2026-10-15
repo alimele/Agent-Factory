@@ -7,8 +7,9 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from api.blueprint.blueprint_schema import AgentBlueprint
-from api.blueprint.catalog_mvp import KNOWLEDGE_CATALOG, MODEL_POLICIES
+from api.blueprint.catalog_mvp import MODEL_POLICIES
 from api.blueprint.api_center_catalog import get_foundry_tool
+from api.blueprint.knowledge_registry import get_foundry_tool as get_knowledge_mcp_tool
 
 
 def _render_instructions(blueprint: AgentBlueprint) -> str:
@@ -34,31 +35,11 @@ def _render_instructions(blueprint: AgentBlueprint) -> str:
 
 
 def _resolve_knowledge_tools(knowledge_source_ids: List[str]) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Group knowledge sources by Foundry tool type and merge their tool_resources."""
     tools: List[Dict[str, Any]] = []
-    resources: Dict[str, Any] = {}
-
-    file_search_vector_store_ids: List[str] = []
-    ai_search_indexes: List[Dict[str, Any]] = []
-
     for ks_id in knowledge_source_ids:
-        entry = KNOWLEDGE_CATALOG[ks_id]  # KeyError here = blueprint referenced an unapproved id; let it raise
-        tool_type = entry["foundry_tool_type"]
-        if tool_type == "file_search":
-            file_search_vector_store_ids += entry["tool_resource"]["file_search"]["vector_store_ids"]
-        elif tool_type == "azure_ai_search":
-            ai_search_indexes += entry["tool_resource"]["azure_ai_search"]["indexes"]
-        else:
-            raise ValueError(f"Unhandled knowledge tool type '{tool_type}' for {ks_id}")
-
-    if file_search_vector_store_ids:
-        tools.append({"type": "file_search"})
-        resources["file_search"] = {"vector_store_ids": file_search_vector_store_ids}
-    if ai_search_indexes:
-        tools.append({"type": "azure_ai_search"})
-        resources["azure_ai_search"] = {"indexes": ai_search_indexes}
-
-    return tools, resources
+        mcp_config = get_knowledge_mcp_tool(ks_id)
+        tools.append({"type": "mcp", "mcp": mcp_config})
+    return tools, {}  # knowledge MCP tools carry their own config, no tool_resources needed
 
 
 def to_foundry_agent_payload(blueprint: AgentBlueprint) -> Dict[str, Any]:

@@ -2,11 +2,6 @@ import { useNavigate } from "react-router-dom";
 import { useBlueprint } from "../BlueprintContext";
 import { CoreBlueprintDraft } from "../api";
 
-// All the catalog-bound fields here (department, agentType, pattern,
-// modelPolicy, dataClassification) are rendered as <select>s constrained to
-// the same catalog values the backend used — editing them client-side is
-// fine for UX, since blueprint/compile re-validates every one of these
-// server-side before anything is trusted (see blueprint_compiler.py).
 const AGENT_TYPES = ["Knowledge Assistant", "Analyst", "Process Agent", "Action Agent", "Monitoring Agent"];
 const DATA_CLASSIFICATIONS = ["Public", "Internal", "Confidential", "HR-Sensitive", "Financial", "Security-Restricted"];
 
@@ -14,83 +9,28 @@ export default function ContextPage() {
   const navigate = useNavigate();
   const { coreDraft, setCoreDraft } = useBlueprint();
 
-  if (!coreDraft) {
-    return (
-      <div>
-        <h2>Context</h2>
-        <p>Go back to Describe first — nothing's been generated yet.</p>
-        <button onClick={() => navigate("/describe")}>Back to Describe</button>
-      </div>
-    );
-  }
+  if (!coreDraft) return <section className="page"><p className="eyebrow">AGENT CONFIGURATION</p><h1 className="pageTitle">Define the context</h1><div className="notice">Start on Describe to generate an agent draft first.</div><button className="btn primary" onClick={() => navigate("/describe")}>Back to Describe</button></section>;
 
-  // TS can't narrow `coreDraft` as non-null inside this closure on its own
-  // (it's component state, not a local const) — the early return above
-  // guarantees it at runtime, so we assert it here rather than re-checking.
-  const draft = coreDraft as CoreBlueprintDraft;
-
+  const draft: CoreBlueprintDraft = coreDraft;
   function update<K extends keyof CoreBlueprintDraft>(key: K, value: CoreBlueprintDraft[K]) {
     setCoreDraft({ ...draft, [key]: value });
   }
 
-  return (
-    <div>
-      <h2>Context</h2>
-      <p>Here's what we understood from your description — review and adjust anything that's off.</p>
-
-      <label>
-        Agent name
-        <input value={coreDraft.name} onChange={(e) => update("name", e.target.value)} />
-      </label>
-      <br />
-
-      <label>
-        Department
-        <input value={coreDraft.department} disabled title="Set by Describe — go back to change it" />
-      </label>
-      <br />
-
-      <label>
-        Agent type
-        <select value={coreDraft.agentType} onChange={(e) => update("agentType", e.target.value)}>
-          {AGENT_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-      </label>
-      <br />
-
-      <label>
-        Purpose
-        <textarea value={coreDraft.purpose} onChange={(e) => update("purpose", e.target.value)} rows={3} />
-      </label>
-      <br />
-
-      <label>
-        Data classification
-        <select
-          value={coreDraft.dataClassification}
-          onChange={(e) => update("dataClassification", e.target.value)}
-        >
-          {DATA_CLASSIFICATIONS.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
-      </label>
-      <br />
-
-      <label>
-        <input
-          type="checkbox"
-          checked={coreDraft.humanApproval}
-          onChange={(e) => update("humanApproval", e.target.checked)}
-        />
-        Require human approval before this agent's actions run
-      </label>
-
-      <div style={{ marginTop: 12 }}>
-        <button onClick={() => navigate("/knowledge")}>Next: Knowledge</button>
+  return <section className="page">
+    <p className="eyebrow">AGENT CONFIGURATION · STEP 2 OF 10</p>
+    <h1 className="pageTitle">Define the context</h1>
+    <p className="pageIntro">Review the details inferred from your description. These define the agent’s purpose and the sensitivity of the information it may handle.</p>
+    <div className="card formCard">
+      <div className="formGrid">
+        <label className="field"><span className="label">Agent name</span><input className="input" value={draft.name} onChange={e => update("name", e.target.value)} placeholder="e.g. IT Support Assistant" /></label>
+        <label className="field"><span className="label">Department</span><input className="input" value={draft.department} disabled title="Set from the initial description" /><span className="fieldHint">To change the department, update the initial description.</span></label>
+        <label className="field"><span className="label">Agent type</span><select className="select" value={draft.agentType} onChange={e => update("agentType", e.target.value)}>{AGENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
+        <label className="field"><span className="label">Data classification</span><select className="select" value={draft.dataClassification} onChange={e => update("dataClassification", e.target.value)}>{DATA_CLASSIFICATIONS.map(d => <option key={d} value={d}>{d}</option>)}</select><span className="fieldHint">Choose the highest sensitivity of data this agent may process.</span></label>
+        <label className="field full"><span className="label">Purpose and responsibilities</span><textarea className="textarea" rows={4} value={draft.purpose} onChange={e => update("purpose", e.target.value)} placeholder="Describe what the agent should help users accomplish." /></label>
       </div>
     </div>
-  );
+    <div className="card optionCard"><div><strong>Require human approval for actions</strong><p className="fieldHint">Keep a person in control before the agent performs actions.</p></div><input className="toggleCheck" type="checkbox" checked={draft.humanApproval} onChange={e => update("humanApproval", e.target.checked)} aria-label="Require human approval for actions" /></div>
+    <div className="notice">These selections are checked again by the backend when the blueprint is compiled.</div>
+    <div className="pageActions"><button className="btn" onClick={() => navigate("/describe")}>Back</button><button className="btn primary" onClick={() => navigate("/knowledge")} disabled={!draft.name.trim() || !draft.purpose.trim()}>Continue to Knowledge <span aria-hidden="true">→</span></button></div>
+  </section>;
 }
