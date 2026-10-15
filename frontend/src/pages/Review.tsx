@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useBlueprint } from "../BlueprintContext";
-import { compileBlueprint } from "../api";
+import { compileBlueprint, createTestAgent } from "../api";
 import { callPolicyEvaluate } from "../callPolicyEvaluate";
 
 interface CheckResult { id: string; name: string; status: "pass" | "fail" | "flagged" | "skipped"; reason: string }
@@ -15,23 +15,44 @@ function SummaryCard({ label, value, detail }: { label: string; value: string; d
 export default function Review() {
   const { instance } = useMsal();
   const navigate = useNavigate();
-  const { coreDraft, selectedKnowledgeIds, selectedToolIds, selectedAudienceIds, behavior, compileResult, setCompileResult } = useBlueprint();
+  const { coreDraft, selectedKnowledgeIds, selectedToolIds, selectedAudienceIds, behavior, compileResult, setCompileResult, createdAgent, setCreatedAgent } = useBlueprint();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [policyResult, setPolicyResult] = useState<PolicyEvaluation | null>(null);
+  const [agentCreating, setAgentCreating] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
 
   if (!coreDraft) return <section className="page"><h1 className="pageTitle">Review blueprint</h1><div className="notice">Go back to Describe to create an agent draft first.</div><button className="btn primary" onClick={() => navigate("/describe")}>Back to Describe</button></section>;
   const draft = coreDraft;
 
   async function handleCompile() {
-    setLoading(true); setError(null); setPolicyResult(null);
+    setLoading(true); setError(null); setPolicyResult(null); setCreatedAgent(null); setAgentError(null);
     try {
       const result = await compileBlueprint(instance, { coreDraft: draft, knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds, audienceIds: selectedAudienceIds });
       setCompileResult(result);
     } catch (e) { setError(e instanceof Error ? e.message : "Blueprint compilation failed."); }
     finally { setLoading(false); }
+  }
+
+  async function handleCreateTestAgent() {
+    if (!compileResult || !policyResult || policyResult.overall_status === "fail") return;
+    setAgentCreating(true); setAgentError(null);
+    try {
+      const response = await createTestAgent(instance, {
+        coreDraft: draft,
+        knowledgeSourceIds: selectedKnowledgeIds,
+        toolIds: selectedToolIds,
+        audienceIds: selectedAudienceIds,
+        behavior,
+      });
+      setCreatedAgent(response.agent);
+    } catch (e) {
+      setAgentError(e instanceof Error ? e.message : "Foundry test-agent creation failed.");
+    } finally {
+      setAgentCreating(false);
+    }
   }
 
   async function handlePolicyCheck() {
@@ -72,6 +93,12 @@ export default function Review() {
       <div className="card policyPanel"><div><h3>Pre-deployment policy check</h3><p className="pageIntro compact">Evaluate the compiled blueprint against the current policy service.</p></div><button className="btn primary" onClick={handlePolicyCheck} disabled={policyLoading}>{policyLoading ? "Checking policy…" : "Run policy check"}</button></div>
       {policyError && <div className="notice errorNotice">{policyError}</div>}
       {policyResult && <div className={`policyResult ${policyResult.overall_status}`}><div className="policyResultHead"><strong>{policyResult.overall_status === "pass" ? "Policy check passed" : policyResult.overall_status === "fail" ? "Policy check blocked" : "Policy review required"}</strong><span className="pill">Risk: {policyResult.risk_tier}</span></div>{policyResult.required_approvers.length > 0 && <p>Required approvers: {policyResult.required_approvers.join(", ")}</p>}<div className="checkList">{policyResult.checks.map(check => <div className="checkResult" key={check.id}><span className={`checkStatus ${check.status}`}>{check.status === "pass" ? "✓" : check.status === "fail" ? "!" : check.status === "flagged" ? "⚑" : "–"}</span><div><strong>{check.name}</strong><p>{check.reason}</p></div><span className="pill">{check.status}</span></div>)}</div>{policyResult.overall_status !== "fail" && <div className="notice warn">The policy check does not create or publish an agent. Foundry dev/test agent creation is not wired up yet (Phase 4).</div>}</div>}
+      <div className="card compilePanel"><div className="compileIcon">↗</div><div className="compileCopy"><h2 className="sectionTitle">Create development agent in Foundry</h2><p className="pageIntro compact">Creates a real, unpublished Foundry agent version using the approved blueprint, knowledge sources, tools, and behavior preferences. The backend repeats catalog and policy validation.</p></div><button className="btn primary" onClick={handleCreateTestAgent} disabled={agentCreating || policyLoading || !policyResult || policyResult.overall_status === "fail"}>{agentCreating ? "Creating in Foundry…" : createdAgent ? "Create a new version" : "Create test agent"}</button></div>
+      {!policyResult && <p className="fieldHint">Run the pre-deployment policy check first.</p>}
+      {policyResult?.overall_status === "fail" && <div className="notice errorNotice">The policy gate is blocking creation. Resolve the failed checks before creating an agent.</div>}
+      {policyResult?.overall_status === "flagged" && <div className="notice warn">The blueprint is flagged for review. A development version may be created for testing, but this does not approve publication.</div>}
+      {agentError && <div className="notice errorNotice">{agentError}</div>}
+      {createdAgent && <div className="notice"><strong>Foundry development agent created</strong><p>Name: {createdAgent.name} · Version: {createdAgent.version} · Model: {createdAgent.model}</p><p>This version is not published. Continue to Test to try it with a prompt.</p></div>}
       <details className="technicalDetails"><summary>Technical details (JSON)</summary><p className="fieldHint">Use these payloads for debugging. They are not required for normal review.</p><h3>Compiled blueprint</h3><pre>{JSON.stringify(compileResult.blueprint, null, 2)}</pre><h3>Foundry payload</h3><pre>{JSON.stringify(compileResult.foundryPayload, null, 2)}</pre></details>
     </div>}
     <div className="pageActions"><button className="btn" onClick={() => navigate("/security")}>Back</button>{compileResult && <button className="btn primary" onClick={() => navigate("/test")} disabled={policyResult?.overall_status === "fail"}>Continue to Test <span aria-hidden="true">→</span></button>}</div>

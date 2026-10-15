@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
-import { CoreBlueprintDraft, CatalogResponse, CompileResponse } from "./api";
+import { CoreBlueprintDraft, CatalogResponse, CompileResponse, CreatedAgent } from "./api";
 
 export interface BehaviorPreferences {
   instructions: string;
@@ -34,6 +34,8 @@ interface BlueprintState {
   setBehavior: (v: BehaviorPreferences) => void;
   compileResult: CompileResponse | null;
   setCompileResult: (v: CompileResponse | null) => void;
+  createdAgent: CreatedAgent | null;
+  setCreatedAgent: (v: CreatedAgent | null) => void;
   agentCreated: boolean;
   setAgentCreated: (v: boolean) => void;
 }
@@ -49,6 +51,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
   const [behavior, setBehavior] = useState<BehaviorPreferences>(defaultBehavior);
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
+  const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(null);
   const [agentCreated, setAgentCreated] = useState(false);
 
   return (
@@ -56,7 +59,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
       description, setDescription, coreDraft, setCoreDraft, catalog, setCatalog,
       selectedKnowledgeIds, setSelectedKnowledgeIds, selectedToolIds, setSelectedToolIds,
       selectedAudienceIds, setSelectedAudienceIds, behavior, setBehavior,
-      compileResult, setCompileResult, agentCreated, setAgentCreated,
+      compileResult, setCompileResult, createdAgent, setCreatedAgent, agentCreated, setAgentCreated,
     }}>
       {children}
     </BlueprintContext.Provider>

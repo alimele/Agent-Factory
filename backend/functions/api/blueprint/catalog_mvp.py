@@ -21,7 +21,7 @@ MODEL_POLICIES = {
     # you choose that name yourself when you deploy in the portal). These
     # are placeholders: confirm what you actually deploy and rename to match.
     "approved-general-enterprise": "gpt-5",
-    "approved-high-accuracy": "gpt-5-pro",
+    "approved-high-accuracy": "gpt-5.2",
     "approved-fast-lowcost": "gpt-5-mini",
 }
 

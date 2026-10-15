@@ -16,6 +16,12 @@ from pydantic import ValidationError
 from api.blueprint.blueprint_generator import generate_core_blueprint, build_core_draft_model
 from api.blueprint.blueprint_compiler import compile_blueprint, CatalogValidationError
 from api.blueprint.foundry_payload import to_foundry_agent_payload
+from api.blueprint.foundry_service import (
+    BehaviorOptions, TestAgentRequest, create_test_agent, run_test_query,
+)
+from api.policy.engine import evaluate
+from api.policy.identity import build_context, TokenError
+from api.policy.models import Stage
 from api.blueprint.catalog_mvp import (
     mvp_catalog_snapshot,
     knowledge_sources_for_department,
@@ -180,3 +186,116 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
         "blueprint": blueprint.model_dump(),
         "foundryPayload": foundry_payload,
     })
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Create a real, unpublished Foundry development/test agent
+# ---------------------------------------------------------------------------
+def _validated_blueprint_for_foundry(body: dict, requester_email: str):
+    """Rebuild the blueprint from catalog IDs; never trust a frontend payload."""
+    core_draft_raw = body.get("coreDraft")
+    if not isinstance(core_draft_raw, dict):
+        raise ValueError("'coreDraft' is required and must be an object")
+
+    catalog = mvp_catalog_snapshot()
+    CoreDraftModel = build_core_draft_model(catalog)
+    try:
+        core_draft = CoreDraftModel(**core_draft_raw)
+    except ValidationError as exc:
+        raise ValueError(f"coreDraft failed validation: {exc}") from exc
+
+    try:
+        return compile_blueprint(
+            core_draft=core_draft,
+            knowledge_source_ids=body.get("knowledgeSourceIds", []),
+            tool_ids=body.get("toolIds", []),
+            audience_ids=body.get("audienceIds", []),
+            requester_email=requester_email,
+            channels=body.get("channels"),
+        )
+    except CatalogValidationError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+@app.route(route="blueprint/create-test-agent", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def blueprint_create_test_agent(req: func.HttpRequest) -> func.HttpResponse:
+    """Revalidate selections and pre-deploy policy, then create an unpublished test version."""
+    try:
+        requester = get_requester(req)
+    except UnauthenticatedError as exc:
+        return _error_response(str(exc), 401)
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON", 400)
+    if not isinstance(body, dict):
+        return _error_response("Request body must be a JSON object", 400)
+
+    try:
+        blueprint = _validated_blueprint_for_foundry(body, requester.email)
+        behavior_raw = body.get("behavior") or {}
+        if not isinstance(behavior_raw, dict):
+            return _error_response("'behavior' must be a JSON object", 400)
+        behavior = BehaviorOptions(**behavior_raw)
+    except (ValueError, ValidationError) as exc:
+        return _error_response(str(exc), 400)
+
+    try:
+        context = build_context(req)
+    except TokenError as exc:
+        return _error_response(str(exc), 401)
+
+    try:
+        policy_result = evaluate(blueprint.model_dump(), context, Stage.PRE_DEPLOY)
+    except Exception as exc:
+        logging.exception("Pre-deploy policy evaluation failed before Foundry creation")
+        return _error_response("Pre-deploy policy evaluation failed; no Foundry agent was created", 502)
+
+    policy_json = policy_result.model_dump(mode="json")
+    if policy_result.overall_status.value == "fail":
+        return _json_response({
+            "error": "The pre-deploy policy gate blocked Foundry creation.",
+            "policyEvaluation": policy_json,
+        }, 403)
+
+    try:
+        agent = create_test_agent(blueprint, behavior)
+    except Exception:
+        logging.exception("Foundry development agent creation failed")
+        return _error_response(
+            "Foundry could not create the development agent. Check Function App logs, model deployment names, project permissions, and tool definitions.",
+            502,
+        )
+
+    return _json_response({"agent": agent, "policyEvaluation": policy_json}, 201)
+
+
+@app.route(route="blueprint/test-agent", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def blueprint_test_agent(req: func.HttpRequest) -> func.HttpResponse:
+    """Run a prompt only against a development agent owned by the signed-in requester."""
+    try:
+        requester = get_requester(req)
+    except UnauthenticatedError as exc:
+        return _error_response(str(exc), 401)
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON", 400)
+    if not isinstance(body, dict):
+        return _error_response("Request body must be a JSON object", 400)
+    try:
+        test_request = TestAgentRequest(**body)
+    except ValidationError as exc:
+        return _error_response(f"Test request failed validation: {exc}", 400)
+
+    try:
+        result = run_test_query(test_request, requester.email)
+    except PermissionError as exc:
+        return _error_response(str(exc), 403)
+    except ValueError as exc:
+        return _error_response(str(exc), 400)
+    except Exception:
+        logging.exception("Foundry test query failed")
+        return _error_response("The Foundry test query failed. Check Function App logs and the agent's connected tools.", 502)
+    return _json_response(result)

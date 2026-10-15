@@ -77,7 +77,31 @@ export interface CompileResponse {
   foundryPayload: Record<string, unknown>;
 }
 
-// ---- The three calls ----
+export interface CreatedAgent {
+  name: string;
+  id: string | null;
+  version: string;
+  model: string;
+  status: "created";
+  environment: "development";
+}
+
+export interface CreateTestAgentResponse {
+  agent: CreatedAgent;
+  policyEvaluation: {
+    overall_status: "pass" | "fail" | "flagged";
+    risk_tier: "low" | "medium" | "high" | "restricted";
+    required_approvers: string[];
+  };
+}
+
+export interface RunTestAgentResponse {
+  agentName: string;
+  agentVersion: string;
+  outputText: string;
+}
+
+// ---- The calls ----
 
 export function generateCoreBlueprint(msal: IPublicClientApplication, description: string) {
   return callApi<CoreBlueprintDraft>(msal, "/blueprint/core", {
@@ -112,5 +136,46 @@ export function compileBlueprint(
       audienceIds: args.audienceIds,
       channels: args.channels,
     }),
+  });
+}
+
+export function createTestAgent(
+  msal: IPublicClientApplication,
+  args: {
+    coreDraft: CoreBlueprintDraft;
+    knowledgeSourceIds: string[];
+    toolIds: string[];
+    audienceIds: string[];
+    channels?: string[];
+    behavior: {
+      instructions: string;
+      responseStyle: "Concise" | "Balanced" | "Detailed";
+      citeSources: boolean;
+      askClarifyingQuestions: boolean;
+      escalateUncertainty: boolean;
+    };
+  }
+) {
+  const { requestedBy, ...coreDraftFields } = args.coreDraft;
+  return callApi<CreateTestAgentResponse>(msal, "/blueprint/create-test-agent", {
+    method: "POST",
+    body: JSON.stringify({
+      coreDraft: coreDraftFields,
+      knowledgeSourceIds: args.knowledgeSourceIds,
+      toolIds: args.toolIds,
+      audienceIds: args.audienceIds,
+      channels: args.channels,
+      behavior: args.behavior,
+    }),
+  });
+}
+
+export function runTestAgent(
+  msal: IPublicClientApplication,
+  args: { agentName: string; agentVersion: string; prompt: string }
+) {
+  return callApi<RunTestAgentResponse>(msal, "/blueprint/test-agent", {
+    method: "POST",
+    body: JSON.stringify(args),
   });
 }

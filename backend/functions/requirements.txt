@@ -3,5 +3,6 @@ pydantic
 openai
 azure-identity
 azure-mgmt-apicenter
-azure-ai-projects>=2.1.0
+azure-ai-projects>=2.6.0,<3.0.0
+PyYAML>=6.0,<7.0
 azure-appconfiguration
