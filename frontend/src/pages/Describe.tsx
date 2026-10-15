@@ -7,9 +7,13 @@ import { generateCoreBlueprint } from "../api";
 export default function Describe() {
   const { instance } = useMsal();
   const navigate = useNavigate();
-  const { description, setDescription, setCoreDraft } = useBlueprint();
+  const { description, setDescription, setCoreDraft,setCatalog, 
+    setSelectedKnowledgeIds, setSelectedToolIds, setSelectedAudienceIds, 
+    setCompileResult } = useBlueprint();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+
 
   async function handleSubmit() {
     if (!description.trim()) {
@@ -21,6 +25,11 @@ export default function Describe() {
     try {
       const draft = await generateCoreBlueprint(instance, description);
       setCoreDraft(draft);
+      setCatalog(null);
+      setSelectedKnowledgeIds([]);
+      setSelectedToolIds([]);
+      setSelectedAudienceIds([]);
+      setCompileResult(null);
       navigate("/context");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong generating the blueprint.");
