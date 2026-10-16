@@ -1,8 +1,4 @@
 """Phase 4: create and test development agents in Microsoft Foundry.
-
-Call create_test_agent only after compiling the submitted selections against the
-server-side catalog and evaluating the pre-deploy policy. This module resolves
-all knowledge/tools through the existing approved registries.
 """
 from __future__ import annotations
 
@@ -225,9 +221,9 @@ def _metadata(blueprint: AgentBlueprint) -> dict[str, str]:
 
 
 def _project_client() -> AIProjectClient:
-    endpoint = os.environ.get("FOUNDRY_PROJECT_ENDPOINT")
+    endpoint = os.environ.get("FOUNDRY_ACTUAL_PROJECT_ENDPOINT")
     if not endpoint:
-        raise RuntimeError("FOUNDRY_PROJECT_ENDPOINT app setting is required")
+        raise RuntimeError("FOUNDRY_ACTUAL_PROJECT_ENDPOINT app setting is required")
     return AIProjectClient(
         endpoint=endpoint,
         credential=DefaultAzureCredential(),
