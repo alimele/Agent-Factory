@@ -17,7 +17,12 @@ deployment) is in run_live_core_call() at the bottom, not run by default.
 from api.blueprint.blueprint_generator import build_core_draft_model
 from api.blueprint.blueprint_compiler import compile_blueprint, CatalogValidationError
 from api.blueprint.foundry_payload import to_foundry_agent_payload
-from api.blueprint.catalog_mvp import mvp_catalog_snapshot, knowledge_sources_for_department, tools_for_department
+from api.blueprint.catalog_mvp import (
+    _build_audiences,
+    mvp_catalog_snapshot,
+    knowledge_sources_for_department,
+    tools_for_department,
+)
 
 
 def check(label, condition):
@@ -55,7 +60,7 @@ def test_knowledge_and_action_three_stage():
         core_draft=core,
         knowledge_source_ids=["HR-SharePoint-Leave"],
         tool_ids=["ServiceNow-Create-HR-Request"],
-        audience_ids=["All-Employees"],
+        audience_ids=[],
         requester_email="user@customer.com",
     )
 
@@ -80,7 +85,7 @@ def test_rejects_unapproved_id():
             core_draft=core,
             knowledge_source_ids=[],
             tool_ids=["Not-A-Real-Tool"],  # e.g. a tampered request
-            audience_ids=["All-Employees"],
+            audience_ids=[],
             requester_email="user@customer.com",
         )
         check("tampered tool id was rejected", False)
@@ -100,12 +105,24 @@ def test_knowledge_only_no_tools():
         core_draft=core,
         knowledge_source_ids=["Finance-SharePoint-Policies"],
         tool_ids=[],
-        audience_ids=["Finance-Team"],
+        audience_ids=[],
         requester_email="user@customer.com",
     )
     payload = to_foundry_agent_payload(bp)
     tool_types = {t["type"] for t in payload["tools"]}
     check("only knowledge tool present", tool_types == {"file_search"})
+
+
+def test_audiences_use_configured_group_ids():
+    audiences = _build_audiences({
+        "finance-group-id": "Finance",
+        "hr-group-id": "HR",
+        "unlisted-group-id": "Other",
+    })
+    check("audience labels map to configured Entra group IDs", audiences == {
+        "Finance-Team": {"entra_group_id": "finance-group-id"},
+        "HR-Team": {"entra_group_id": "hr-group-id"},
+    })
 
 
 def run_live_core_call():
@@ -125,4 +142,5 @@ if __name__ == "__main__":
     test_knowledge_and_action_three_stage()
     test_rejects_unapproved_id()
     test_knowledge_only_no_tools()
+    test_audiences_use_configured_group_ids()
     print("\nAll offline checks passed.")

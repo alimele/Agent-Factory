@@ -703,9 +703,9 @@ export default function Tools() {
 
         <button
           className="btn primary"
-          onClick={() => navigate("/security")}
+          onClick={() => navigate("/behavior")}
         >
-          Next: Security &amp; Audience →
+          Next: Behavior →
         </button>
       </div>
     </div>

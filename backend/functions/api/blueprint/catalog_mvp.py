@@ -3,6 +3,9 @@ MVP catalogs — 5-10 tools, a handful of knowledge sources, matching the
 "5-8 agent templates / 5-10 tools" MVP scope in the project plan (section 9).
 """
 
+import json
+import os
+
 from api.blueprint.blueprint_schema import CatalogSnapshot
 from api.blueprint.api_center_catalog import tools_for_department
 from api.blueprint.knowledge_registry import knowledge_sources_for_department  # re-export
@@ -31,12 +34,21 @@ DATA_CLASSIFICATIONS = [
 
 CHANNELS = ["Teams", "M365Copilot"]
 
-AUDIENCES = {
-    "All-Employees": {"entra_group_id": "TODO-group-id-all-employees"},
-    "HR-Team": {"entra_group_id": "TODO-group-id-hr"},
-    "Finance-Team": {"entra_group_id": "TODO-group-id-finance"},
-    "IT-Support-Team": {"entra_group_id": "TODO-group-id-it-support"},
-}
+
+def _build_audiences(group_department_map: dict[str, str]) -> dict[str, dict[str, str]]:
+    audiences = {}
+    for group_id, department in group_department_map.items():
+        if department not in DEPARTMENTS:
+            continue
+
+        audience_id = f"{department.replace(' ', '-')}-Team"
+        if audience_id in audiences:
+            raise ValueError(f"Multiple Entra groups configured for audience '{audience_id}'")
+        audiences[audience_id] = {"entra_group_id": group_id}
+    return audiences
+
+
+AUDIENCES = _build_audiences(json.loads(os.environ.get("GROUP_DEPARTMENT_MAP", "{}")))
 
 def mvp_catalog_snapshot() -> CatalogSnapshot:
     return CatalogSnapshot(

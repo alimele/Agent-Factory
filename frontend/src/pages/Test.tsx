@@ -58,7 +58,7 @@ export default function Test() {
         <div className="pageActions"><button className="btn" onClick={() => navigate("/review")}>Back to Review</button><button className="btn primary" onClick={handleRunTest} disabled={loading || !prompt.trim()}>{loading ? "Running test…" : "Run test prompt"}</button></div>
       </div>
       {error && <div className="notice errorNotice">{error}</div>}
-      {output !== null && <div className="reviewSection"><h2 className="sectionTitle">Agent response</h2><div className="card"><pre className="testOutput">{output}</pre></div></div>}
+      {output !== null && <div className="reviewSection"><h2 className="sectionTitle">Agent response</h2><div className="card"><div className="testOutput" role="article" aria-label="Agent response">{output}</div></div></div>}
     </section>
   );
 }
