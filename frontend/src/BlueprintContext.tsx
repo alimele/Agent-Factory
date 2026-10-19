@@ -9,8 +9,14 @@ export interface BehaviorPreferences {
   escalateUncertainty: boolean;
 }
 
-const defaultBehavior: BehaviorPreferences = {
-  instructions: "Use approved enterprise sources. Be accurate, explain uncertainty, and do not invent facts.",
+// Instructions start empty and get set to the Describe page's generated
+// `purpose` text the moment a draft is created (see Describe.tsx) — that's
+// the "AI-generated instructions pre-fill the box" behavior. From then on
+// it's just a normal field: whatever's in it (untouched or edited) is what
+// gets sent, combined with the reliability-rule toggles below and the
+// governance lines the backend always appends (api/blueprint/instructions.py).
+export const defaultBehavior: BehaviorPreferences = {
+  instructions: "",
   responseStyle: "Balanced",
   citeSources: true,
   askClarifyingQuestions: true,

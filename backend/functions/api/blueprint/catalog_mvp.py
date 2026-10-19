@@ -18,6 +18,12 @@ AGENT_TYPES = [
 
 PATTERNS = ["knowledge_only", "knowledge_action", "process", "monitoring"]
 
+# Agent types that must never carry a write-capable tool. Enforced by
+# api/policy/rules.py::check_agent_type() and reflected in the instructions
+# sent to the real Foundry agent (api/blueprint/instructions.py), so both the
+# policy gate and the model's own behavior agree on what these types may do.
+READ_ONLY_AGENT_TYPES = {"Knowledge Assistant", "Monitoring Agent"}
+
 MODEL_POLICIES = {
     # internal policy name -> your Azure OpenAI DEPLOYMENT name in Foundry
     # (not a bare model id — Azure OpenAI routes by deployment name, and
@@ -50,9 +56,16 @@ def _build_audiences(group_department_map: dict[str, str]) -> dict[str, dict[str
 
 AUDIENCES = _build_audiences(json.loads(os.environ.get("GROUP_DEPARTMENT_MAP", "{}")))
 
-def mvp_catalog_snapshot() -> CatalogSnapshot:
+def mvp_catalog_snapshot(departments: list[str] | None = None) -> CatalogSnapshot:
+    """
+    departments: restrict the Stage 1 (Describe page) LLM to this subset
+    instead of the full DEPARTMENTS list — used to constrain a requester to
+    their own department (function_app.py::blueprint_core()) now that the
+    Knowledge/Actions catalog endpoint is department-gated, so Stage 1 can
+    no longer hand back a department the requester isn't allowed to browse.
+    """
     return CatalogSnapshot(
-        departments=DEPARTMENTS,
+        departments=departments if departments else DEPARTMENTS,
         agent_types=AGENT_TYPES,
         patterns=PATTERNS,
         model_policies=list(MODEL_POLICIES.keys()),

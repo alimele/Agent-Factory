@@ -20,3 +20,18 @@ def approved_knowledge_ids(department: str) -> set[str]:
 
 def unapproved(selected, approved: set[str]) -> list[str]:
     return [item for item in selected if item not in approved]
+
+
+def tool_risk_levels(department: str, tool_ids) -> dict[str, str]:
+    """
+    Real risk level per selected tool, straight from the live API Center
+    catalog (the same `risk` property the Tools page shows as a pill) —
+    never guessed from the tool's name/id. A tool id that isn't in the
+    catalog (stale selection, deprecated/removed tool) comes back as
+    "unknown" rather than being silently dropped, so callers can decide
+    to treat an unresolvable tool as risky by default.
+    """
+    catalog = tools_for_department(department)
+    return {
+        tool_id: catalog.get(tool_id, {}).get("risk", "unknown") for tool_id in tool_ids
+    }

@@ -10,6 +10,7 @@ ALL_RULES = [
     rules.check_identity,
     rules.check_department,
     rules.check_model,
+    rules.check_agent_type,
     rules.check_knowledge,
     rules.check_tools,
     rules.check_permissions,

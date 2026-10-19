@@ -6,32 +6,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from api.blueprint.blueprint_schema import AgentBlueprint
+from api.blueprint.blueprint_schema import AgentBlueprint, BehaviorOptions
 from api.blueprint.catalog_mvp import MODEL_POLICIES
 from api.blueprint.api_center_catalog import get_foundry_tool
 from api.blueprint.knowledge_registry import get_foundry_tool as get_knowledge_mcp_tool
-
-
-def _render_instructions(blueprint: AgentBlueprint) -> str:
-    lines = [blueprint.purpose.strip()]
-    if blueprint.tools:
-        lines.append(
-            "You may take actions using your available tools when the user's "
-            "request clearly calls for it. Confirm before any action with "
-            "side effects unless the request is explicitly a direct instruction to do so."
-        )
-    if blueprint.knowledgeSources:
-        lines.append(
-            "Ground your answers in the knowledge sources available to you. "
-            "If the answer isn't in them, say so rather than guessing."
-        )
-    if blueprint.dataClassification in {"HR-Sensitive", "Financial", "Security-Restricted"}:
-        lines.append(
-            f"This agent handles {blueprint.dataClassification} data. Do not disclose it "
-            "to anyone outside the approved audience, and do not repeat it back in full "
-            "unless the requester is clearly entitled to see it."
-        )
-    return "\n\n".join(lines)
+from api.blueprint.instructions import build_instructions
 
 
 def _resolve_knowledge_tools(knowledge_source_ids: List[str]) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -42,7 +21,15 @@ def _resolve_knowledge_tools(knowledge_source_ids: List[str]) -> tuple[List[Dict
     return tools, {}  # knowledge MCP tools carry their own config, no tool_resources needed
 
 
-def to_foundry_agent_payload(blueprint: AgentBlueprint) -> Dict[str, Any]:
+def to_foundry_agent_payload(
+    blueprint: AgentBlueprint, behavior: BehaviorOptions | None = None
+) -> Dict[str, Any]:
+    """
+    behavior is optional only so existing offline callers (test_phase2.py)
+    that never cared about Behavior-page data keep working unchanged. Every
+    real HTTP caller (function_app.py::blueprint_compile) now passes it, so
+    this preview matches what create-test-agent will actually build.
+    """
     tools: List[Dict[str, Any]] = []
     tool_resources: Dict[str, Any] = {}
 
@@ -59,7 +46,7 @@ def to_foundry_agent_payload(blueprint: AgentBlueprint) -> Dict[str, Any]:
     payload = {
         "name": blueprint.name,
         "model": MODEL_POLICIES[blueprint.modelPolicy],
-        "instructions": _render_instructions(blueprint),
+        "instructions": build_instructions(blueprint, behavior),
         "tools": tools,                 # [] is valid — e.g. a pure Q&A agent with no file_search either
         "tool_resources": tool_resources,  # {} is valid when tools is []
         "metadata": {

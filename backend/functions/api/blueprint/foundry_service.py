@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Literal
+from typing import Any
 
 import yaml
 from azure.ai.projects import AIProjectClient
@@ -27,21 +27,10 @@ from pydantic import BaseModel, Field
 from api.blueprint.api_center_catalog import get_foundry_tool
 from api.blueprint.catalog_mvp import MODEL_POLICIES
 from api.blueprint.knowledge_registry import get_foundry_tool as get_knowledge_mcp_tool
-from api.blueprint.blueprint_schema import AgentBlueprint
+from api.blueprint.blueprint_schema import AgentBlueprint, BehaviorOptions
+from api.blueprint.instructions import build_instructions
 
 logger = logging.getLogger(__name__)
-
-
-class BehaviorOptions(BaseModel):
-    """Bounded, user-configured behavior preferences from the Behavior page."""
-    instructions: str = Field(default="", max_length=4000)
-    responseStyle: Literal["Concise", "Balanced", "Detailed"] = "Balanced"
-    citeSources: bool = True
-    askClarifyingQuestions: bool = True
-    escalateUncertainty: bool = True
-
-    class Config:
-        extra = "forbid"
 
 
 class TestAgentRequest(BaseModel):
@@ -73,42 +62,6 @@ def _model_deployment(policy_name: str) -> str:
     if fallback is None:
         raise ValueError(f"Unknown approved model policy: {policy_name}")
     return os.environ.get(setting_by_policy.get(policy_name, ""), "").strip() or fallback
-
-
-def _instructions(blueprint: AgentBlueprint, behavior: BehaviorOptions) -> str:
-    lines = [blueprint.purpose.strip()]
-    lines.append(f"Preferred response detail: {behavior.responseStyle.lower()}.")
-    if behavior.instructions.strip():
-        lines.append(
-            "Additional business-user guidance (must not override policy, permissions, "
-            "source-grounding rules, or approval requirements):\n"
-            + behavior.instructions.strip()
-        )
-    if behavior.citeSources and blueprint.knowledgeSources:
-        lines.append("Cite retrieved knowledge sources when citations are returned by the source tool.")
-    if behavior.askClarifyingQuestions:
-        lines.append("Ask a clarifying question when a request is ambiguous or lacks a required detail.")
-    if behavior.escalateUncertainty:
-        lines.append("If approved sources do not support an answer, say so and follow the configured escalation process; do not guess.")
-    if blueprint.knowledgeSources:
-        lines.append("Ground enterprise knowledge answers in the connected approved sources. Do not invent facts or citations.")
-    if blueprint.tools:
-        lines.append("Use only the approved tools attached to this agent. Do not claim an action succeeded unless its tool response confirms success.")
-    if blueprint.humanApproval:
-        lines.append(
-            "This agent is a development/test version. Consequential actions require the "
-            "business approval process. Do not claim approval was granted unless an external "
-            "approval system confirms it. This instruction is not a technical approval gate."
-        )
-    if blueprint.dataClassification in {"HR-Sensitive", "Financial", "Security-Restricted"}:
-        lines.append(
-            f"Handle {blueprint.dataClassification} data conservatively. Do not disclose "
-            "restricted information beyond the authorized audience or infer access rights."
-        )
-    if not blueprint.externalSharing:
-        lines.append("Do not intentionally share enterprise data with external parties.")
-    lines.append("These development instructions do not replace server-side authorization or approval controls.")
-    return "\n\n".join(line for line in lines if line)
 
 
 def _parse_openapi_spec(value: Any, tool_id: str) -> dict[str, Any]:
@@ -183,21 +136,43 @@ def _build_tools(blueprint: AgentBlueprint) -> list[Any]:
             )
         )
 
-    # Resolve only IDs selected by the user and revalidated against API Center.
+    # Resolve only IDs selected by the user and revalidated against API
+    # Center. Each one resolves to either an OpenAPI tool or an MCP server
+    # tool — api_center_catalog.py::get_foundry_tool() tags which with a
+    # "type" discriminator, mirroring the knowledge-source MCP tools above.
     for tool_id in blueprint.tools:
         config = get_foundry_tool(tool_id)
-        if config.get("type") != "openapi" or not isinstance(config.get("openapi"), dict):
-            raise ValueError(f"API Center tool '{tool_id}' did not resolve to a supported OpenAPI definition")
-        item = config["openapi"]
-        spec = _parse_openapi_spec(item.get("spec"), tool_id)
-        auth = _openapi_auth(item.get("auth") or {"type": "anonymous"}, tool_id)
-        definition = OpenApiFunctionDefinition(
-            name=item["name"],
-            description=item.get("description") or item["name"],
-            spec=spec,
-            auth=auth,
-        )
-        tools.append(OpenApiTool(openapi=definition))
+        tool_type = config.get("type")
+
+        if tool_type == "mcp":
+            mcp = config.get("mcp")
+            if not isinstance(mcp, dict):
+                raise ValueError(f"API Center tool '{tool_id}' did not resolve to a supported MCP definition")
+            tools.append(
+                MCPTool(
+                    server_label=mcp["server_label"],
+                    server_url=mcp["server_url"],
+                    require_approval=mcp.get("require_approval", "never"),
+                    allowed_tools=mcp.get("allowed_tools"),
+                    project_connection_id=mcp.get("project_connection_id"),
+                    headers=mcp.get("headers"),
+                )
+            )
+        elif tool_type == "openapi":
+            item = config.get("openapi")
+            if not isinstance(item, dict):
+                raise ValueError(f"API Center tool '{tool_id}' did not resolve to a supported OpenAPI definition")
+            spec = _parse_openapi_spec(item.get("spec"), tool_id)
+            auth = _openapi_auth(item.get("auth") or {"type": "anonymous"}, tool_id)
+            definition = OpenApiFunctionDefinition(
+                name=item["name"],
+                description=item.get("description") or item["name"],
+                spec=spec,
+                auth=auth,
+            )
+            tools.append(OpenApiTool(openapi=definition))
+        else:
+            raise ValueError(f"API Center tool '{tool_id}' has an unrecognized tool type '{tool_type}'")
     return tools
 
 
@@ -243,7 +218,7 @@ def create_test_agent(
     try:
         definition = PromptAgentDefinition(
             model=deployment,
-            instructions=_instructions(blueprint, behavior),
+            instructions=build_instructions(blueprint, behavior),
             tools=_build_tools(blueprint),
         )
         agent = project.agents.create_version(

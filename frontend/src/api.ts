@@ -77,6 +77,17 @@ export interface CompileResponse {
   foundryPayload: Record<string, unknown>;
 }
 
+// Mirrors backend BehaviorOptions (blueprint_schema.py). Shared by
+// compileBlueprint and createTestAgent so the Review page's preview and
+// the actual Foundry creation call always send the same behavior shape.
+export interface BehaviorPayload {
+  instructions: string;
+  responseStyle: "Concise" | "Balanced" | "Detailed";
+  citeSources: boolean;
+  askClarifyingQuestions: boolean;
+  escalateUncertainty: boolean;
+}
+
 export interface CreatedAgent {
   name: string;
   id: string | null;
@@ -124,6 +135,7 @@ export function compileBlueprint(
     toolIds: string[];
     audienceIds: string[];
     channels?: string[];
+    behavior?: BehaviorPayload;
   }
 ) {
   const { requestedBy, ...coreDraftFields } = args.coreDraft; // requestedBy is informational only, not part of the schema
@@ -135,6 +147,7 @@ export function compileBlueprint(
       toolIds: args.toolIds,
       audienceIds: args.audienceIds,
       channels: args.channels,
+      behavior: args.behavior,
     }),
   });
 }
@@ -147,13 +160,7 @@ export function createTestAgent(
     toolIds: string[];
     audienceIds: string[];
     channels?: string[];
-    behavior: {
-      instructions: string;
-      responseStyle: "Concise" | "Balanced" | "Detailed";
-      citeSources: boolean;
-      askClarifyingQuestions: boolean;
-      escalateUncertainty: boolean;
-    };
+    behavior: BehaviorPayload;
   }
 ) {
   const { requestedBy, ...coreDraftFields } = args.coreDraft;

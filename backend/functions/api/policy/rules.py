@@ -1,17 +1,20 @@
 """
-The 14-point governance checklist from the project plan (section 6),
-as individual, independently testable functions.
-
 Each rule takes the compiled blueprint dict + EvalContext and returns
 a CheckResult. Rules never raise for a policy failure — fail/flag is
 a normal result, not an exception. Only genuine bad input should raise.
 """
-from api.policy.catalogs import approved_knowledge_ids, approved_tool_ids, unapproved
+from api.blueprint.catalog_mvp import MODEL_POLICIES, READ_ONLY_AGENT_TYPES
+from api.policy.catalogs import approved_knowledge_ids, approved_tool_ids, tool_risk_levels, unapproved
 from api.policy.models import CheckResult, CheckStatus, EvalContext, Stage
 
 RESTRICTED_DATA_CLASSES = {"Security-Restricted"}
 SENSITIVE_DATA_CLASSES = {"Confidential", "HR-Sensitive", "Financial"}
-WRITE_ACTION_HINTS = ("create", "update", "delete", "approve", "transfer", "send")
+
+# A tool only counts as "read-only" when the API Center catalog actually
+# says risk="low". Anything else — medium/high/critical, or "unknown"
+# because the tool id didn't resolve in the catalog at all — is treated as
+# write-capable. Fail-safe: an unresolvable tool is never assumed harmless.
+READ_ONLY_RISK = "low"
 
 
 def check_identity(bp: dict, ctx: EvalContext) -> CheckResult:
@@ -32,7 +35,10 @@ def check_department(bp: dict, ctx: EvalContext) -> CheckResult:
 
 
 def check_model(bp: dict, ctx: EvalContext) -> CheckResult:
-    allowed = {"approved-general-enterprise"}  # extend as you add model policies
+    # Pulled from the live catalog instead of a hardcoded set, so adding a
+    # model policy to catalog_mvp.MODEL_POLICIES is enough on its own — no
+    # second place to remember to update.
+    allowed = set(MODEL_POLICIES.keys())
     ok = bp.get("modelPolicy") in allowed
     return CheckResult(id="model", name="Model",
                         status=CheckStatus.PASS if ok else CheckStatus.FLAGGED,
@@ -86,12 +92,30 @@ def check_data_sensitivity(bp: dict, ctx: EvalContext) -> CheckResult:
 
 
 def check_actions(bp: dict, ctx: EvalContext) -> CheckResult:
-    tools = [t.lower() for t in (bp.get("tools") or [])]
-    writes = [t for t in tools if any(h in t for h in WRITE_ACTION_HINTS)]
+    tools = bp.get("tools") or []
+    if not tools:
+        return CheckResult(id="actions", name="Actions", status=CheckStatus.PASS, reason="")
+    risk_by_tool = tool_risk_levels(bp["department"], tools)
+    writes = [t for t in tools if risk_by_tool.get(t, "unknown").lower() != READ_ONLY_RISK]
     if not writes:
         return CheckResult(id="actions", name="Actions", status=CheckStatus.PASS, reason="")
-    return CheckResult(id="actions", name="Actions", status=CheckStatus.FLAGGED,
-                        reason=f"State-changing tools present: {writes}")
+    return CheckResult(
+        id="actions", name="Actions", status=CheckStatus.FLAGGED,
+        reason=f"Tools with elevated risk present: {[(t, risk_by_tool.get(t, 'unknown')) for t in writes]}",
+    )
+
+
+def check_agent_type(bp: dict, ctx: EvalContext) -> CheckResult:
+    agent_type = bp.get("agentType")
+    if agent_type not in READ_ONLY_AGENT_TYPES:
+        return CheckResult(id="agent_type", name="Agent type", status=CheckStatus.PASS, reason="")
+    tools = bp.get("tools") or []
+    if not tools:
+        return CheckResult(id="agent_type", name="Agent type", status=CheckStatus.PASS, reason="")
+    return CheckResult(
+        id="agent_type", name="Agent type", status=CheckStatus.FAIL,
+        reason=f"'{agent_type}' agents must not have action tools attached; found: {tools}",
+    )
 
 
 def check_human_in_loop(bp: dict, ctx: EvalContext) -> CheckResult:

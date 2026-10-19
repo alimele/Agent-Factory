@@ -1,10 +1,5 @@
 """
 This is the Azure Functions entrypoint for the Blueprint API.
-
-Routes:
-  POST /api/blueprint/core                -> Stage 1 (Describe page)
-  GET  /api/blueprint/catalog/{department} -> Stage 2 (Knowledge/Actions pages)
-  POST /api/blueprint/compile              -> Stage 3 (Review page)
 """
 
 import json
@@ -15,10 +10,9 @@ from pydantic import ValidationError
 
 from api.blueprint.blueprint_generator import generate_core_blueprint, build_core_draft_model
 from api.blueprint.blueprint_compiler import compile_blueprint, CatalogValidationError
+from api.blueprint.blueprint_schema import BehaviorOptions
 from api.blueprint.foundry_payload import to_foundry_agent_payload
-from api.blueprint.foundry_service import (
-    BehaviorOptions, TestAgentRequest, create_test_agent, run_test_query,
-)
+from api.blueprint.foundry_service import TestAgentRequest, create_test_agent, run_test_query
 from api.policy.engine import evaluate
 from api.policy.identity import build_context, TokenError
 from api.policy.models import Stage
@@ -68,7 +62,17 @@ def blueprint_core(req: func.HttpRequest) -> func.HttpResponse:
     if not description:
         return _error_response("'description' is required", 400)
 
-    catalog = mvp_catalog_snapshot()  # TODO Phase 3: filter by requester's Entra groups/department
+    # Constrain Stage 1 to the requester's own department (via their Entra
+    # groups / GROUP_DEPARTMENT_MAP) so it can never hand back a department
+    # the requester isn't allowed to browse the Knowledge/Actions catalog
+    # for. Best-effort: if department mapping fails for any reason, fall
+    # back to the unconstrained list rather than blocking Describe outright
+    # — get_requester() above already gated this endpoint on real auth.
+    try:
+        requester_department = build_context(req).requester_department
+    except TokenError:
+        requester_department = None
+    catalog = mvp_catalog_snapshot([requester_department] if requester_department else None)
 
     try:
         core_draft = generate_core_blueprint(description, catalog)
@@ -90,18 +94,35 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
     Returns the knowledge sources and tools approved for the given
     department, for the Knowledge/Actions pages to render as pickable
     options. No model call — a pure catalog lookup.
+
+    Gated to the requester's own department: build_context() reads their
+    Entra groups via GROUP_DEPARTMENT_MAP (api/policy/identity.py), the
+    same mapping the PRE_DEPLOY policy gate's check_department() already
+    relies on. Browsing another department's catalog is a 403, not just a
+    policy flag caught later at Submit — previously any authenticated user
+    could GET any department's knowledge/tool catalog.
     """
     try:
-        get_requester(req)  # still gated; result not otherwise used here
-    except UnauthenticatedError as e:
+        context = build_context(req)
+    except TokenError as e:
         return _error_response(str(e), 401)
 
     department = req.route_params.get("department")
     if department not in DEPARTMENTS:
         return _error_response(f"Unknown department '{department}'", 404)
 
+    if context.requester_department != department:
+        return _error_response(
+            f"You are not authorized to view the '{department}' catalog.", 403
+        )
+
     knowledge = knowledge_sources_for_department(department)
     tools = tools_for_department(department)
+
+    # One audience per department, named "<Department>-Team" and carrying
+    # its real Entra group id (catalog_mvp.py::_build_audiences(), driven by
+    # GROUP_DEPARTMENT_MAP) — only expose this department's own entry.
+    own_audience_id = f"{department.replace(' ', '-')}-Team"
 
     # Only hand the frontend what it needs to render a picker — not the
     # internal Foundry-shape fragments (tool_resource/foundry_tool), which
@@ -114,11 +135,7 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
         "tools": [
             {"id": k, "displayName": v["display_name"], "risk": v.get("risk")} for k, v in tools.items()
         ],
-        # Not yet department-filtered (MVP: audiences aren't tagged to a
-        # department in catalog_mvp.py) — every requester sees the full
-        # audience list. Worth revisiting in Phase 3 alongside real
-        # permission-aware filtering.
-        "audiences": [{"id": k} for k in AUDIENCES.keys()],
+        "audiences": [{"id": k} for k in AUDIENCES.keys() if k == own_audience_id],
     })
 
 
@@ -134,13 +151,17 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
       "knowledgeSourceIds": ["..."],
       "toolIds": ["..."],
       "audienceIds": ["..."],
-      "channels": ["Teams"]            # optional
+      "channels": ["Teams"],           # optional
+      "behavior": { ... }              # optional — Behavior page's BehaviorOptions shape
     }
 
     No model call. Re-validates coreDraft against the catalog (don't trust
     whatever the client echoes back between pages) and validates every
     picked id, then returns both the governance blueprint and the
-    Foundry-ready agent-creation payload.
+    Foundry-ready agent-creation payload. `behavior` is included so the
+    returned foundryPayload.instructions is the *same* text
+    /blueprint/create-test-agent would actually send to Foundry, not a
+    simplified stand-in — see api/blueprint/instructions.py.
     """
     try:
         requester = get_requester(req)
@@ -180,7 +201,15 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
     except CatalogValidationError as e:
         return _error_response(str(e), 400)
 
-    foundry_payload = to_foundry_agent_payload(blueprint)
+    behavior_raw = body.get("behavior") or {}
+    if not isinstance(behavior_raw, dict):
+        return _error_response("'behavior' must be a JSON object", 400)
+    try:
+        behavior = BehaviorOptions(**behavior_raw)
+    except ValidationError as e:
+        return _error_response(f"'behavior' failed validation: {e}", 400)
+
+    foundry_payload = to_foundry_agent_payload(blueprint, behavior)
 
     return _json_response({
         "blueprint": blueprint.model_dump(),

@@ -4,7 +4,7 @@ CREDO Agent Blueprint — the governance-rich object the NLP layer produces.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
@@ -56,6 +56,25 @@ class AgentBlueprint(BaseModel):
 
     class Config:
         extra = "forbid"  # a blueprint with an unexpected field fails closed, not open
+
+
+class BehaviorOptions(BaseModel):
+    """
+    Bounded, user-configured behavior preferences from the Behavior page.
+
+    Lives here (not in foundry_service.py) because both the real agent
+    creation path (foundry_service.py) and the Review-page preview path
+    (foundry_payload.py) need it — via the shared instructions.py builder —
+    and putting it in either of those would create a circular import.
+    """
+    instructions: str = Field(default="", max_length=4000)
+    responseStyle: Literal["Concise", "Balanced", "Detailed"] = "Balanced"
+    citeSources: bool = True
+    askClarifyingQuestions: bool = True
+    escalateUncertainty: bool = True
+
+    class Config:
+        extra = "forbid"
 
 
 class CatalogSnapshot(BaseModel):

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
-import { useBlueprint } from "../BlueprintContext";
+import { useBlueprint, defaultBehavior } from "../BlueprintContext";
 import { generateCoreBlueprint } from "../api";
 
 export default function Describe() {
@@ -9,7 +9,7 @@ export default function Describe() {
   const navigate = useNavigate();
   const { description, setDescription, setCoreDraft,setCatalog, 
     setSelectedKnowledgeIds, setSelectedToolIds, setSelectedAudienceIds, 
-    setCompileResult } = useBlueprint();
+    setCompileResult, setBehavior } = useBlueprint();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -30,6 +30,12 @@ export default function Describe() {
       setSelectedToolIds([]);
       setSelectedAudienceIds([]);
       setCompileResult(null);
+      // Pre-fill the Behavior page's instructions box with the generated
+      // purpose, so the user has something concrete to edit instead of a
+      // blank box or a generic placeholder. If they never touch it, this
+      // is exactly what gets sent (see instructions.py's dedupe-against-
+      // purpose logic); if they edit it, their edit is what's sent.
+      setBehavior({ ...defaultBehavior, instructions: draft.purpose });
       navigate("/context");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong generating the blueprint.");
