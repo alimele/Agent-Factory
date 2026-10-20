@@ -1,8 +1,15 @@
 {
-  "IsEncrypted": false,
   "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "python",
-    "AzureWebJobsFeatureFlags": "EnableWorkerIndexing"
-  }
+    "FOUNDRY_PROJECT_ENDPOINT": "", #AI endpoint (model)
+    "FOUNDRY_ACTUAL_PROJECT_ENDPOINT":"", #project endpoint
+    "AZURE_OPENAI_DEPLOYMENT": "LLMmodel",
+    "GROUP_DEPARTMENT_MAP": {
+      "dep-group-ID": "department name"
+  },
+    "RESOURCE_GROUP": "",
+    "APICENTER_SERVICE_NAME": "",
+    "APICENTER_WORKSPACE_NAME": "default",
+    "AZURE_SUBSCRIPTION_ID": "",
+    "APPCONFIG_ENDPOINT": ""
+}
 }

@@ -225,7 +225,7 @@ def create_test_agent(
             agent_name=agent_name,
             definition=definition,
             metadata=_metadata(blueprint),
-            description="AAF-generated development/test agent. Not published to users.",
+            description="CREDO-generated development/test agent. Not published to users.",
         )
         result = {
             "name": getattr(agent, "name", agent_name),
