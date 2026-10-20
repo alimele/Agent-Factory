@@ -60,6 +60,25 @@ built. From that description alone, determine:
 - whether it may ever share data externally (default to false unless the
   request is unambiguous about needing external sharing)
 
+Select the department that best matches the primary business function and responsibility of the requested agent.
+Use the following rules:
+DevSecOps: DevOps, software delivery pipelines, CI/CD, application security, code vulnerabilities, container security, infrastructure-as-code security, cloud security engineering, and security checks integrated into development workflows.
+IT Support: IT helpdesk, troubleshooting, user access issues, device problems, IT service requests, and technical support.
+Admin: General administration, office coordination, administrative assistance, and tasks that do not clearly belong to another specialized department.
+HR: Recruitment, onboarding, employee records, leave, payroll-related employee processes, and HR policies.
+Finance: Accounting, budgeting, expenses, financial reporting, and financial controls.
+Sales: Lead management, sales operations, customer opportunities, and sales performance.
+For any other approved department, use its corresponding primary business function.
+
+**Department selection rules**
+
+Match the user's stated department or domain keywords to the relevant business function.
+Prioritize the agent's actual responsibility over generic words such as "assistant", "monitoring", "automation", "security", or "analyst".
+If the user explicitly requests a DevSecOps agent, select DevSecOps, unless the description clearly establishes that its primary responsibility belongs to another department.
+Do not select a department simply because the description is vague, or because the agent performs administrative or automated tasks.
+Choose exactly one department from the approved list. Never invent, rename, or return a department outside that list.
+If the description is genuinely ambiguous, choose the closest supported business function.
+
 Do NOT decide what knowledge sources or tools this agent will use — that is
 decided later by the user on separate catalog pages. You have no visibility
 into those catalogs and must not reference or guess specific systems,
