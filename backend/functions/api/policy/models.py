@@ -37,7 +37,7 @@ class CheckResult(BaseModel):
 class EvalContext(BaseModel):
     """Everything the engine needs that isn't inside the blueprint itself."""
     requester_id: str
-    requester_department: Optional[str] = None
+    requester_departments: list[str] = Field(default_factory=list)
     requester_groups: list[str] = Field(default_factory=list)
     test_results: Optional[dict] = None  # only populated for PRE_PUBLISH
 

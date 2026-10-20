@@ -43,11 +43,6 @@ def _error_response(message: str, status_code: int) -> func.HttpResponse:
 # ---------------------------------------------------------------------------
 @app.route(route="blueprint/core", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def blueprint_core(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Body: { "description": "<the user's plain-language text>" }
-    Returns the Stage 1 CoreBlueprintDraft fields only — no knowledge/tool/
-    audience fields exist on this response at all.
-    """
     try:
         requester = get_requester(req)
     except UnauthenticatedError as e:
@@ -62,17 +57,23 @@ def blueprint_core(req: func.HttpRequest) -> func.HttpResponse:
     if not description:
         return _error_response("'description' is required", 400)
 
-    # Constrain Stage 1 to the requester's own department (via their Entra
-    # groups / GROUP_DEPARTMENT_MAP) so it can never hand back a department
-    # the requester isn't allowed to browse the Knowledge/Actions catalog
-    # for. Best-effort: if department mapping fails for any reason, fall
-    # back to the unconstrained list rather than blocking Describe outright
-    # — get_requester() above already gated this endpoint on real auth.
     try:
-        requester_department = build_context(req).requester_department
+        requester_departments = build_context(req).requester_departments
     except TokenError:
-        requester_department = None
-    catalog = mvp_catalog_snapshot([requester_department] if requester_department else None)
+        requester_departments = []
+
+    if not requester_departments:
+        return _error_response(
+            "Your account isn't mapped to an approved department yet. "
+            "Contact your administrator to get access before creating an agent.",
+            403,
+        )
+
+    # Unconstrained on purpose: let the model classify the request honestly
+    # against the full department list, then gate on the result below. A
+    # pre-narrowed catalog can't ever disagree with the requester's own
+    # department, which is exactly the bug this replaces.
+    catalog = mvp_catalog_snapshot()
 
     try:
         core_draft = generate_core_blueprint(description, catalog)
@@ -80,8 +81,17 @@ def blueprint_core(req: func.HttpRequest) -> func.HttpResponse:
         logging.exception("Stage 1 generation failed")
         return _error_response(f"Blueprint generation failed: {e}", 502)
 
+    if core_draft.department not in requester_departments:
+        return _error_response(
+            f"This request looks like it belongs to the '{core_draft.department}' department. "
+            f"You're approved for: {', '.join(requester_departments)}. "
+            "Rephrase your description so it matches an approved department, or contact your "
+            "administrator for access.",
+            403,
+        )
+
     result = core_draft.model_dump()
-    result["requestedBy"] = requester.email  # echoed for the frontend to carry through, not trusted at compile time
+    result["requestedBy"] = requester.email
     return _json_response(result)
 
 
@@ -111,7 +121,7 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
     if department not in DEPARTMENTS:
         return _error_response(f"Unknown department '{department}'", 404)
 
-    if context.requester_department != department:
+    if department not in context.requester_departments:
         return _error_response(
             f"You are not authorized to view the '{department}' catalog.", 403
         )
@@ -188,6 +198,16 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
         core_draft = CoreDraftModel(**core_draft_raw)
     except ValidationError as e:
         return _error_response(f"coreDraft failed validation: {e}", 400)
+
+    try:
+        requester_departments = build_context(req).requester_departments
+    except TokenError:
+        requester_departments = []
+    if core_draft.department not in requester_departments:
+        return _error_response(
+            f"You are not authorized to compile a blueprint for the '{core_draft.department}' department.",
+            403,
+        )
 
     try:
         blueprint = compile_blueprint(

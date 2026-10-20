@@ -12,22 +12,29 @@ import base64
 import json
 import os
 
+from api.blueprint.catalog_mvp import DEPARTMENTS
 from api.policy.models import EvalContext
 
 _GROUP_DEPARTMENT_MAP: dict[str, str] = json.loads(os.environ.get("GROUP_DEPARTMENT_MAP", "{}"))
 _OID_CLAIM = "http://schemas.microsoft.com/identity/claims/objectidentifier"
 
+_ALL_DEPARTMENTS_SENTINEL = "*"
 
 class TokenError(Exception):
     pass
 
 
-def _department_for_groups(groups: list[str]) -> str | None:
+def _departments_for_groups(groups: list[str]) -> list[str]:
+    matched: set[str] = set()
     for group_id in groups:
-        dept = _GROUP_DEPARTMENT_MAP.get(group_id)
-        if dept:
-            return dept
-    return None
+        mapped = _GROUP_DEPARTMENT_MAP.get(group_id)
+        if not mapped:
+            continue
+        if mapped == _ALL_DEPARTMENTS_SENTINEL:
+            return list(DEPARTMENTS)
+        if mapped in DEPARTMENTS:
+            matched.add(mapped)
+    return sorted(matched)
 
 
 def build_context(req, test_results: dict | None = None) -> EvalContext:
@@ -50,7 +57,7 @@ def build_context(req, test_results: dict | None = None) -> EvalContext:
 
     return EvalContext(
         requester_id=requester_id,
-        requester_department=_department_for_groups(groups),
+        requester_departments=_departments_for_groups(groups),
         requester_groups=groups,
         test_results=test_results,
     )

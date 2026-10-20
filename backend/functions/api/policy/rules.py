@@ -25,14 +25,14 @@ def check_identity(bp: dict, ctx: EvalContext) -> CheckResult:
 
 
 def check_department(bp: dict, ctx: EvalContext) -> CheckResult:
-    if ctx.requester_department is None:
-        return CheckResult(id="department", name="Department", status=CheckStatus.SKIPPED,
-                            reason="Requester department not wired yet")
-    ok = ctx.requester_department == bp.get("department")
+    departments = ctx.requester_departments
+    if not departments:
+        return CheckResult(id="department", name="Department", status=CheckStatus.FAIL,
+                            reason="Requester has no approved department access configured")
+    ok = bp.get("department") in departments
     return CheckResult(id="department", name="Department",
                         status=CheckStatus.PASS if ok else CheckStatus.FAIL,
-                        reason="" if ok else f"Requester is not in {bp.get('department')}")
-
+                        reason="" if ok else f"Requester is not approved for department '{bp.get('department')}'")
 
 def check_model(bp: dict, ctx: EvalContext) -> CheckResult:
     # Pulled from the live catalog instead of a hardcoded set, so adding a

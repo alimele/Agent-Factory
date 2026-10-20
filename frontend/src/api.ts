@@ -38,8 +38,15 @@ async function callApi<T>(
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+    const bodyText = await res.text();
+    let message = bodyText;
+    try {
+      const parsed = JSON.parse(bodyText);
+      if (parsed && typeof parsed.error === "string") message = parsed.error;
+    } catch {
+      // not JSON — fall back to the raw response text
+    }
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }
