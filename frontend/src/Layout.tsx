@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useBlueprint } from "./BlueprintContext";
+import { getAdminStatus } from "./api";
 import "./theme.css";
 
 const pages = [
@@ -41,6 +43,18 @@ export default function Layout() {
   const location = useLocation();
   const currentIndex = pages.findIndex((p) => location.pathname.includes(p.path));
 
+  // Purely a UI convenience — hides the Admin link for people who don't
+  // have it. The actual boundary is server-side: every /admin/* route
+  // independently checks ADMIN_GROUP_IDS regardless of what this shows.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getAdminStatus(instance)
+      .then((status) => { if (!cancelled) setIsAdmin(status.isAdmin); })
+      .catch(() => { if (!cancelled) setIsAdmin(false); });
+    return () => { cancelled = true; };
+  }, [instance]);
+
   return (
     <div className="app">
       <header className="top">
@@ -75,6 +89,20 @@ export default function Layout() {
               );
             })}
           </div>
+          {isAdmin && (
+            <>
+              <div className="sideTitle" style={{ marginTop: 28 }}>Catalog admin</div>
+              <div className="steps">
+                <NavLink
+                  to="/admin/knowledge-sources"
+                  className={({ isActive }) => "step" + (isActive ? " active" : "")}
+                >
+                  <div className="num">⚙</div>
+                  <div><strong>Knowledge sources</strong></div>
+                </NavLink>
+              </div>
+            </>
+          )}
         </nav>
         <main className="main">
           <div className="content">

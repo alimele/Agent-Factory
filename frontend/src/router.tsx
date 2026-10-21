@@ -10,6 +10,7 @@ import Review from "./pages/Review";
 import Test from "./pages/Test";
 import Submit from "./pages/Submit";
 import Lifecycle from "./pages/Lifecycle";
+import AdminKnowledgeSources from "./pages/AdminKnowledgeSources";
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
       { path: "test", element: <Test /> },
       { path: "submit", element: <Submit /> },
       { path: "lifecycle", element: <Lifecycle /> },
+      { path: "admin/knowledge-sources", element: <AdminKnowledgeSources /> },
     ],
   },
 ]);

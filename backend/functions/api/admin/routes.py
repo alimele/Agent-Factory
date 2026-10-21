@@ -3,12 +3,7 @@ Admin-only HTTP surface for managing the knowledge-source catalog.
 
 This is deliberately separate from anything a regular department user can
 reach. Registering a knowledge source provisions a Foundry project
-connection (api/blueprint/connection_manager.py) — the identity that does
-this needs the Foundry Project Manager role on the project's parent
-resource, which is a materially bigger permission than "can create agents
-for my own department". Gate accordingly: being approved for a department
-in GROUP_DEPARTMENT_MAP says nothing about being trusted to manage the
-catalog and the Foundry connections behind it.
+connection
 """
 import json
 import logging
@@ -20,6 +15,7 @@ from api.blueprint import connection_manager
 from api.blueprint.catalog_mvp import DEPARTMENTS
 from api.blueprint.knowledge_registry import (
     audit_connection_assignments,
+    list_all_knowledge_sources,
     register_knowledge_source,
 )
 from api.policy.identity import TokenError, build_context, is_admin
@@ -51,8 +47,8 @@ def _error_response(message: str, status_code: int) -> func.HttpResponse:
 
 
 def _require_admin(req: func.HttpRequest):
-    """Returns the built EvalContext, or raises by returning an HttpResponse-shaped error.
-    Callers check `isinstance(result, func.HttpResponse)`."""
+    """Returns the built EvalContext, or an HttpResponse error. Callers check
+    `isinstance(result, func.HttpResponse)`."""
     try:
         context = build_context(req)
     except TokenError as exc:
@@ -65,17 +61,60 @@ def _require_admin(req: func.HttpRequest):
     return context
 
 
+@bp.route(route="admin/me", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def admin_me_route(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Tells the frontend whether the signed-in user should see admin UI at
+    all. Deliberately does NOT 403 a non-admin — it's a status check, not a
+    gated operation; every other route in this file still enforces
+    is_admin() independently, so this endpoint being permissive teaches a
+    caller nothing they couldn't already infer by being signed in.
+    """
+    try:
+        context = build_context(req)
+    except TokenError as exc:
+        return _error_response(str(exc), 401)
+    return _json_response({"isAdmin": is_admin(context.requester_groups)})
+
+
+@bp.route(route="admin/knowledge-sources", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def list_knowledge_sources_route(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    The full catalog, unfiltered by department, for the admin UI's list
+    view. Deliberately cheap — reads only App Configuration, no live ARM
+    calls — so it's safe to load whenever the admin page opens. Connection
+    health (whether each entry's connection actually matches) is a
+    separate, explicit action: see audit_knowledge_sources_route.
+    """
+    guard = _require_admin(req)
+    if isinstance(guard, func.HttpResponse):
+        return guard
+
+    sources = list_all_knowledge_sources()
+    items = [
+        {
+            "sourceId": source_id,
+            "displayName": item.get("displayName", source_id),
+            "departments": item.get("department", []),
+            "dataClassification": item.get("dataClassification", "Internal"),
+            "searchServiceEndpoint": item.get("searchServiceEndpoint"),
+            "knowledgeBaseName": item.get("knowledgeBaseName"),
+            "connectionName": item.get("projectConnectionName"),
+            "agentFactoryReady": item.get("agentFactoryReady", False),
+        }
+        for source_id, item in sorted(sources.items())
+    ]
+    return _json_response({"knowledgeSources": items})
+
+
 @bp.route(route="admin/knowledge-sources", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def register_knowledge_source_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     Body: see RegisterKnowledgeSourceRequest. Creates or updates a
     knowledge-source catalog entry AND the Foundry project connection
-    behind it, atomically from the caller's point of view — the connection
-    is provisioned first, and only on success is the App Configuration
-    entry written (knowledge_registry.register_knowledge_source). There is
-    no field for projectConnectionName: it is always derived from
-    sourceId, so it can never be mistyped or copy-pasted from an unrelated
-    entry.
+    behind it — the connection is provisioned first, and only on success is
+    the App Configuration entry written. There is no field for
+    projectConnectionName: it is always derived from sourceId.
     """
     guard = _require_admin(req)
     if isinstance(guard, func.HttpResponse):
@@ -122,10 +161,9 @@ def register_knowledge_source_route(req: func.HttpRequest) -> func.HttpResponse:
 def audit_knowledge_sources_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     Cross-checks every registered knowledge source against the live Foundry
-    connections and flags anything that looks like the Alpha Bank /
-    knowledgebase107 bug class: a shared connection across two different
-    knowledge bases, a connection whose live target doesn't match what the
-    registry entry expects, or a missing/unreadable connection.
+    connections. Makes a live ARM call per entry, so this is an explicit,
+    admin-triggered action in the UI rather than something loaded
+    automatically — see list_knowledge_sources_route for the cheap list.
     """
     guard = _require_admin(req)
     if isinstance(guard, func.HttpResponse):

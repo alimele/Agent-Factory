@@ -193,3 +193,82 @@ export function runTestAgent(
     body: JSON.stringify(args),
   });
 }
+
+// ---- Admin: knowledge-source catalog ----
+// Separate from the department-scoped /blueprint/catalog/{department} call
+// above — these hit /admin/* routes, which require ADMIN_GROUP_IDS
+// membership server-side regardless of what the UI shows or hides.
+
+export interface AdminStatus {
+  isAdmin: boolean;
+}
+
+export interface AdminKnowledgeSource {
+  sourceId: string;
+  displayName: string;
+  departments: string[];
+  dataClassification: string;
+  searchServiceEndpoint: string | null;
+  knowledgeBaseName: string | null;
+  connectionName: string | null;
+  agentFactoryReady: boolean;
+}
+
+export interface RegisterKnowledgeSourceArgs {
+  sourceId: string;
+  displayName: string;
+  departments: string[];
+  dataClassification: string;
+  searchServiceEndpoint: string;
+  knowledgeBaseName: string;
+  agentFactoryReady?: boolean;
+}
+
+export interface RegisterKnowledgeSourceResponse {
+  sourceId: string;
+  connectionName: string;
+  mcpTarget: string;
+  displayName: string;
+  department: string[];
+  dataClassification: string;
+  searchServiceEndpoint: string;
+  knowledgeBaseName: string;
+  projectConnectionName: string;
+  agentFactoryReady: boolean;
+}
+
+export interface AuditFinding {
+  sourceId: string;
+  issue: string;
+  connectionName?: string;
+  detail?: string;
+}
+
+export interface AuditResponse {
+  findings: AuditFinding[];
+  clean: boolean;
+}
+
+export function getAdminStatus(msal: IPublicClientApplication) {
+  return callApi<AdminStatus>(msal, "/admin/me", { method: "GET" });
+}
+
+export function listKnowledgeSourcesAdmin(msal: IPublicClientApplication) {
+  return callApi<{ knowledgeSources: AdminKnowledgeSource[] }>(msal, "/admin/knowledge-sources", {
+    method: "GET",
+  });
+}
+
+export function registerKnowledgeSource(
+  msal: IPublicClientApplication,
+  args: RegisterKnowledgeSourceArgs
+) {
+  return callApi<RegisterKnowledgeSourceResponse>(msal, "/admin/knowledge-sources", {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+}
+
+export function auditKnowledgeSources(msal: IPublicClientApplication) {
+  return callApi<AuditResponse>(msal, "/admin/knowledge-sources/audit", { method: "GET" });
+}
