@@ -25,10 +25,12 @@ from api.blueprint.catalog_mvp import (
 )
 from api.blueprint.auth import get_requester, UnauthenticatedError
 from api.policy.routes import bp as policy_bp
+from api.admin.routes import bp as admin_bp
 
 app = func.FunctionApp()
 
 app.register_functions(policy_bp)
+app.register_functions(admin_bp)
 
 def _json_response(body: dict, status_code: int = 200) -> func.HttpResponse:
     return func.HttpResponse(json.dumps(body), status_code=status_code, mimetype="application/json")

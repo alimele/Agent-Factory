@@ -20,6 +20,16 @@ _OID_CLAIM = "http://schemas.microsoft.com/identity/claims/objectidentifier"
 
 _ALL_DEPARTMENTS_SENTINEL = "*"
 
+# Deliberately a separate app setting from GROUP_DEPARTMENT_MAP — department
+# access (what agents you can build) and catalog-admin access (what
+# knowledge sources/connections exist for everyone) are different
+# privileges, and conflating them was part of how the shared-connection bug
+# happened unnoticed. Comma-separated Entra group object ids.
+_ADMIN_GROUP_IDS: set[str] = {
+    g.strip() for g in os.environ.get("ADMIN_GROUP_IDS", "").split(",") if g.strip()
+}
+
+
 class TokenError(Exception):
     pass
 
@@ -35,6 +45,11 @@ def _departments_for_groups(groups: list[str]) -> list[str]:
         if mapped in DEPARTMENTS:
             matched.add(mapped)
     return sorted(matched)
+
+
+def is_admin(groups: list[str]) -> bool:
+    """True if the requester belongs to one of the groups in ADMIN_GROUP_IDS."""
+    return any(g in _ADMIN_GROUP_IDS for g in groups)
 
 
 def build_context(req, test_results: dict | None = None) -> EvalContext:
