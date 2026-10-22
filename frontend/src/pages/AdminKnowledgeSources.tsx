@@ -59,6 +59,10 @@ export default function AdminKnowledgeSources() {
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+  const [submitSuccessAction, setSubmitSuccessAction] = useState<
+    "registered" | "updated" | null
+  >(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<RegisterKnowledgeSourceResponse | null>(null);
@@ -88,6 +92,34 @@ export default function AdminKnowledgeSources() {
 
   useEffect(loadSources, [instance]);
 
+  function startEditing(source: AdminKnowledgeSource) {
+    setEditingSourceId(source.sourceId);
+
+    setForm({
+      sourceId: source.sourceId,
+      displayName: source.displayName,
+      departments: [...(source.departments ?? [])],
+      dataClassification: source.dataClassification || "Internal",
+      searchServiceEndpoint: source.searchServiceEndpoint ?? "",
+      knowledgeBaseName: source.knowledgeBaseName ?? "",
+      agentFactoryReady: source.agentFactoryReady,
+    });
+
+    setShowForm(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    setSubmitSuccessAction(null);
+  }
+
+  function handleAddOrCloseForm() {
+    setShowForm((currentlyOpen) => !currentlyOpen);
+    setEditingSourceId(null);
+    setForm(EMPTY_FORM);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    setSubmitSuccessAction(null);
+  }
+
   function toggleDepartment(dept: string) {
     setForm((f) => ({
       ...f,
@@ -98,9 +130,11 @@ export default function AdminKnowledgeSources() {
   }
 
   async function handleSubmit(e: FormEvent) {
+    const wasEditing = editingSourceId !== null;
     e.preventDefault();
     setSubmitError(null);
     setSubmitSuccess(null);
+    setSubmitSuccessAction(null);
 
     if (!form.sourceId.trim() || !form.displayName.trim()) {
       setSubmitError("Source ID and display name are required.");
@@ -127,6 +161,8 @@ export default function AdminKnowledgeSources() {
         agentFactoryReady: form.agentFactoryReady,
       });
       setSubmitSuccess(result);
+      setSubmitSuccessAction(wasEditing ? "updated" : "registered");
+      setEditingSourceId(null);
       setForm(EMPTY_FORM);
       loadSources();
     } catch (e) {
@@ -173,7 +209,7 @@ export default function AdminKnowledgeSources() {
       </p>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-        <button className="btn primary" onClick={() => { setShowForm((v) => !v); setSubmitError(null); setSubmitSuccess(null); }}>
+        <button className="btn primary" onClick={handleAddOrCloseForm} type="button">
           {showForm ? "Close form" : "+ Add knowledge source"}
         </button>
         <button className="btn" onClick={handleAudit} disabled={auditLoading}>
@@ -183,16 +219,22 @@ export default function AdminKnowledgeSources() {
 
       {showForm && (
         <form className="card formCard" onSubmit={handleSubmit} style={{ marginBottom: 22 }}>
+          <div className="sectionTitle">
+            {editingSourceId ? "Edit knowledge source" : "Register knowledge source"}
+            </div>
           <div className="formGrid">
             <label className="field">
               <span className="label">Source ID</span>
               <input
                 className="input"
                 value={form.sourceId}
+                disabled={editingSourceId !== null}
                 onChange={(e) => setForm((f) => ({ ...f, sourceId: e.target.value }))}
                 placeholder="e.g. alpha-bank-policy"
               />
-              <span className="fieldHint">Stable internal key. Re-registering the same ID updates it in place.</span>
+              <span className="fieldHint">{editingSourceId 
+              ? "Source ID cannot be changed when editing."
+              : "Stable internal key. Re-registering the same ID updates it in place."}</span>
             </label>
             <label className="field">
               <span className="label">Display name</span>
@@ -271,7 +313,7 @@ export default function AdminKnowledgeSources() {
           {submitError && <div className="notice errorNotice" style={{ marginTop: 16 }}>{submitError}</div>}
           {submitSuccess && (
             <div className="notice" style={{ marginTop: 16 }}>
-              <strong>Registered "{submitSuccess.sourceId}"</strong>
+              <strong> {submitSuccessAction === "updated" ? "Updated" : "Registered"} "{submitSuccess.sourceId}"</strong>
               <p>Connection: {submitSuccess.connectionName}</p>
               <p>MCP target: {submitSuccess.mcpTarget}</p>
             </div>
@@ -280,7 +322,7 @@ export default function AdminKnowledgeSources() {
           <div className="pageActions">
             <span />
             <button className="btn primary" type="submit" disabled={submitting}>
-              {submitting ? "Registering…" : "Register knowledge source"}
+              {submitting ? editingSourceId ? "Saving…" : "Registering…" : editingSourceId ? "Save changes" : "Register knowledge source"}
             </button>
           </div>
         </form>
@@ -331,6 +373,13 @@ export default function AdminKnowledgeSources() {
               <span className={`pill ${s.agentFactoryReady ? "green" : "amber"}`}>
                 {s.agentFactoryReady ? "Visible" : "Hidden"}
               </span>
+              <button
+              className="btn"
+              type="button"
+              onClick={() => startEditing(s)}
+              >
+                Edit
+              </button>
             </div>
           ))}
         </div>
