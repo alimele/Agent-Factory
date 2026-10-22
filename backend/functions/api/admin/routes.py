@@ -61,7 +61,7 @@ def _require_admin(req: func.HttpRequest):
     return context
 
 
-@bp.route(route="admin/me", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="catalog-admin/me", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def admin_me_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     Tells the frontend whether the signed-in user should see admin UI at
@@ -77,7 +77,7 @@ def admin_me_route(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"isAdmin": is_admin(context.requester_groups)})
 
 
-@bp.route(route="admin/knowledge-sources", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="catalog-admin/knowledge-sources", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def list_knowledge_sources_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     The full catalog, unfiltered by department, for the admin UI's list
@@ -107,7 +107,7 @@ def list_knowledge_sources_route(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"knowledgeSources": items})
 
 
-@bp.route(route="admin/knowledge-sources", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="catalog-admin/knowledge-sources", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def register_knowledge_source_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     Body: see RegisterKnowledgeSourceRequest. Creates or updates a
@@ -157,7 +157,7 @@ def register_knowledge_source_route(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(result, 201)
 
 
-@bp.route(route="admin/knowledge-sources/audit", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@bp.route(route="catalog-admin/knowledge-sources/audit", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def audit_knowledge_sources_route(req: func.HttpRequest) -> func.HttpResponse:
     """
     Cross-checks every registered knowledge source against the live Foundry

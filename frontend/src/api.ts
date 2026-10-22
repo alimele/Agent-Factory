@@ -250,11 +250,11 @@ export interface AuditResponse {
 }
 
 export function getAdminStatus(msal: IPublicClientApplication) {
-  return callApi<AdminStatus>(msal, "/admin/me", { method: "GET" });
+  return callApi<AdminStatus>(msal, "/catalog-admin/me", { method: "GET" });
 }
 
 export function listKnowledgeSourcesAdmin(msal: IPublicClientApplication) {
-  return callApi<{ knowledgeSources: AdminKnowledgeSource[] }>(msal, "/admin/knowledge-sources", {
+  return callApi<{ knowledgeSources: AdminKnowledgeSource[] }>(msal, "/catalog-admin/knowledge-sources", {
     method: "GET",
   });
 }
@@ -263,12 +263,12 @@ export function registerKnowledgeSource(
   msal: IPublicClientApplication,
   args: RegisterKnowledgeSourceArgs
 ) {
-  return callApi<RegisterKnowledgeSourceResponse>(msal, "/admin/knowledge-sources", {
+  return callApi<RegisterKnowledgeSourceResponse>(msal, "/catalog-admin/knowledge-sources", {
     method: "POST",
     body: JSON.stringify(args),
   });
 }
 
 export function auditKnowledgeSources(msal: IPublicClientApplication) {
-  return callApi<AuditResponse>(msal, "/admin/knowledge-sources/audit", { method: "GET" });
+  return callApi<AuditResponse>(msal, "/catalog-admin/knowledge-sources/audit", { method: "GET" });
 }
