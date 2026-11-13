@@ -380,7 +380,7 @@ export interface AgentRecordInput {
   knowledgeSourceIds: string[];
   toolIds: string[];
   audienceIds: string[];
-  behavior?: Record<string, unknown>;
+  behavior?: BehaviorPayload;
   blueprint?: Record<string, unknown>;
   foundryPayload?: Record<string, unknown>;
   policyEvaluation?: Record<string, unknown>;
