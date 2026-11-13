@@ -6,10 +6,15 @@
     "GROUP_DEPARTMENT_MAP": {
       "dep-group-ID": "department name"
   },
+    "ADMIN_GROUP_IDS": "", #comma-separated Entra group object ids allowed to use /catalog-admin/*
     "RESOURCE_GROUP": "",
     "APICENTER_SERVICE_NAME": "",
     "APICENTER_WORKSPACE_NAME": "default",
     "AZURE_SUBSCRIPTION_ID": "",
-    "APPCONFIG_ENDPOINT": ""
+    "APPCONFIG_ENDPOINT": "",
+    "TEMPLATE_KEY_PREFIX": "agent-templates/", #optional, this is the default
+    "COSMOS_ENDPOINT": "", #e.g. https://<account>.documents.azure.com:443/ — backs My Agents / Playground persistence
+    "COSMOS_DATABASE": "credo-factory", #optional, this is the default
+    "COSMOS_AGENTS_CONTAINER": "agents" #optional, this is the default
 }
 }

@@ -1,51 +1,35 @@
 import { useEffect, useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useBlueprint } from "./BlueprintContext";
 import { getAdminStatus } from "./api";
 import "./theme.css";
 
 const pages = [
-  { path: "describe", label: "Describe" },
-  { path: "context", label: "Context" },
-  { path: "knowledge", label: "Knowledge" },
-  { path: "tools", label: "Tools" },
-  { path: "behavior", label: "Behavior" },
-  { path: "security", label: "Security" },
-  { path: "review", label: "Review" },
-  { path: "test", label: "Test" },
-  { path: "submit", label: "Submit" },
-  { path: "lifecycle", label: "Lifecycle" },
+  { path: "start", label: "Start" },
+  { path: "configure", label: "Configure" },
+  { path: "launch", label: "Review & Launch" },
+  { path: "my-agents", label: "My Agents" },
+  { path: "playground", label: "Playground" },
 ];
 
-// Gating rule: Describe is always open. Context..Review unlock once the
-// core blueprint draft exists (Describe submitted). Test & Submit unlock
-// once the blueprint has been compiled on Review. Lifecycle unlocks only
-// once the agent has actually been created (post-approval).
-function isUnlocked(
-  path: string,
-  hasCoreDraft: boolean,
-  hasCompiled: boolean,
-  agentCreated: boolean
-) {
-  if (path === "describe") return true;
-  if (["context", "knowledge", "tools", "behavior", "security", "review"].includes(path)) {
-    return hasCoreDraft;
-  }
-  if (path === "test" || path === "submit") return hasCompiled;
-  if (path === "lifecycle") return agentCreated;
-  return false;
+// Gating rule, much simpler than the old 10-step version: Start, My Agents
+// and Playground are always open (you can always start something new,
+// always see what you've already built, always test something you've
+// already launched). Configure and Launch need an active draft — either
+// just generated on Start, or resumed from My Agents via loadRecord().
+function isUnlocked(path: string, hasCoreDraft: boolean) {
+  if (path === "start" || path === "my-agents" || path === "playground") return true;
+  return hasCoreDraft;
 }
 
 export default function Layout() {
   const { instance } = useMsal();
-  const { coreDraft, compileResult, agentCreated } = useBlueprint();
-  const location = useLocation();
-  const currentIndex = pages.findIndex((p) => location.pathname.includes(p.path));
+  const { coreDraft } = useBlueprint();
 
-  // Purely a UI convenience — hides the Admin link for people who don't
-  // have it. The actual boundary is server-side: every /admin/* route
-  // independently checks ADMIN_GROUP_IDS regardless of what this shows.
+  // Purely a UI convenience — hides the Admin links for people who don't
+  // have it. The actual boundary is server-side: every /catalog-admin/*
+  // route independently checks ADMIN_GROUP_IDS regardless of what this shows.
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -66,24 +50,22 @@ export default function Layout() {
       </header>
       <div className="layout">
         <nav className="side">
-          <div className="sideTitle">Create agent</div>
+          <div className="sideTitle">Agent Factory</div>
           <div className="steps">
-            {pages.map((p, i) => {
-              const unlocked = isUnlocked(p.path, !!coreDraft, !!compileResult, agentCreated);
-              const done = unlocked && i < currentIndex;
+            {pages.map((p) => {
+              const unlocked = isUnlocked(p.path, !!coreDraft);
               return (
                 <NavLink
                   key={p.path}
-                  to={unlocked ? `/${p.path}` : location.pathname}
+                  to={unlocked ? `/${p.path}` : "#"}
                   onClick={(e) => { if (!unlocked) e.preventDefault(); }}
                   className={({ isActive }) =>
-                    "step" + (isActive ? " active" : "") + (done ? " done" : "") + (!unlocked ? " locked" : "")
+                    "step" + (isActive ? " active" : "") + (!unlocked ? " locked" : "")
                   }
                 >
-                  <div className="num">{done ? "✓" : i + 1}</div>
                   <div>
                     <strong>{p.label}</strong>
-                    {!unlocked && <span>Locked</span>}
+                    {!unlocked && <span>Start an agent first</span>}
                   </div>
                 </NavLink>
               );
@@ -99,6 +81,13 @@ export default function Layout() {
                 >
                   <div className="num">⚙</div>
                   <div><strong>Knowledge sources</strong></div>
+                </NavLink>
+                <NavLink
+                  to="/admin/agent-templates"
+                  className={({ isActive }) => "step" + (isActive ? " active" : "")}
+                >
+                  <div className="num">▦</div>
+                  <div><strong>Agent templates</strong></div>
                 </NavLink>
               </div>
             </>

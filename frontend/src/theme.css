@@ -47,3 +47,71 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}
 
 /* Test agent response: readable proportional text, wrapped long lines, preserved paragraphs. */
 .testOutput{font-family:inherit;font-size:13px;line-height:1.7;color:#344054;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;margin:0;max-width:100%;}
+
+/* ======================================================================
+   Blueprint theme — redesign pass: drafting-paper canvas behind the whole
+   app, plus the Start/Configure/My Agents/Playground component styles.
+   Nothing above this line was touched, so every existing page (Admin
+   pages, the sign-in screen) keeps working unchanged and just inherits
+   the new page background.
+   ====================================================================== */
+:root{--bp-grid-minor:#e7edfb;--bp-grid-major:#cdd9f3;--bp-canvas:#f7f9fd}
+
+body{
+  background-color:var(--bp-canvas);
+  background-image:
+    linear-gradient(var(--bp-grid-minor) 1px,transparent 1px),
+    linear-gradient(90deg,var(--bp-grid-minor) 1px,transparent 1px),
+    linear-gradient(var(--bp-grid-major) 1px,transparent 1px),
+    linear-gradient(90deg,var(--bp-grid-major) 1px,transparent 1px);
+  background-size:16px 16px,16px 16px,80px 80px,80px 80px;
+  background-position:-1px -1px;
+}
+.main{background:transparent}
+
+/* Drafting-mark corners — used on cards that are themselves a "piece of
+   the blueprint" (template cards, agent cards, the main panel on a page),
+   not on every card, so it reads as an accent rather than noise. */
+.schematicCard{position:relative}
+.schematicCard::before,.schematicCard::after{content:"";position:absolute;width:11px;height:11px;border:1.5px solid var(--brand);opacity:.45;pointer-events:none}
+.schematicCard::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.schematicCard::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+
+/* Start: template gallery */
+.templateGroup{margin-top:26px}
+.templateGroup:first-child{margin-top:0}
+.templateGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:12px}
+.templateCard{display:flex;flex-direction:column;align-items:flex-start;gap:7px;text-align:left;padding:17px;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:var(--shadow)}
+.templateCard:not(:disabled):hover{border-color:var(--brand);transform:translateY(-1px)}
+.templateIcon{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border-radius:9px;background:var(--brand2);color:var(--brand);font-size:10px;font-weight:800;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em}
+.templateCard strong{font-size:13px}
+.templateCard small{color:var(--muted);font-size:11px;line-height:1.5}
+
+/* Configure: tabs */
+.tabBar{display:flex;gap:4px;margin:20px 0 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tab{padding:10px 14px;border:0;background:transparent;font-size:12px;font-weight:700;color:var(--muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;margin-bottom:-1px}
+.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+.tabCount{background:var(--brand2);color:var(--brand);border-radius:99px;font-size:9px;padding:2px 6px;font-weight:800}
+
+/* My Agents: status badges + agent cards (reuses .templateGrid for layout) */
+.agentCard{display:flex;flex-direction:column;gap:7px;text-align:left;padding:16px;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:var(--shadow)}
+.agentCard:hover{border-color:var(--brand);transform:translateY(-1px)}
+.agentCardHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.agentCardHead strong{font-size:13px}
+.statusBadge{font-size:9px;font-weight:800;padding:4px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.statusBadge.draft{background:#f2f4f7;color:#667085}
+.statusBadge.compiled{background:#eef2ff;color:var(--brand)}
+.statusBadge.dev_created{background:#fff6df;color:#8a5b00}
+.statusBadge.published{background:#e8f7f0;color:var(--green)}
+.statusBadge.archived{background:#f2f4f7;color:#98a2b3}
+
+/* Playground: chat */
+.playgroundChat{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.chatLog{display:flex;flex-direction:column;gap:9px;min-height:160px;max-height:420px;overflow-y:auto;padding:4px}
+.chatBubble{max-width:80%;padding:10px 13px;border-radius:12px;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.chatBubble.user{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:3px}
+.chatBubble.agent{align-self:flex-start;background:#f2f4f7;color:var(--ink);border-bottom-left-radius:3px}
+.chatInputRow{display:flex;gap:9px}
+.chatInputRow .input{flex:1}
+
+@media(max-width:600px){.templateGrid{grid-template-columns:1fr}}
