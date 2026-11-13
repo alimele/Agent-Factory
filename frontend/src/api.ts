@@ -272,3 +272,132 @@ export function registerKnowledgeSource(
 export function auditKnowledgeSources(msal: IPublicClientApplication) {
   return callApi<AuditResponse>(msal, "/catalog-admin/knowledge-sources/audit", { method: "GET" });
 }
+
+// ---- Admin: agent-template catalog ----
+// The pre-built, department-aligned starting points shown on the Start
+// page. Same admin-gated shape as knowledge sources above.
+
+export interface AdminAgentTemplate {
+  id: string;
+  displayName: string;
+  department: string;
+  agentType: string;
+  pattern: string;
+  purpose: string;
+  modelPolicy: string;
+  dataClassification: string;
+  humanApproval: boolean;
+  externalSharing: boolean;
+  icon: string;
+  description: string;
+}
+
+export interface RegisterAgentTemplateArgs {
+  templateId: string;
+  displayName: string;
+  department: string;
+  agentType: string;
+  pattern: string;
+  purpose: string;
+  modelPolicy: string;
+  dataClassification: string;
+  humanApproval: boolean;
+  externalSharing?: boolean;
+  icon?: string;
+  description?: string;
+}
+
+export function listAgentTemplatesAdmin(msal: IPublicClientApplication) {
+  return callApi<{ templates: AdminAgentTemplate[] }>(msal, "/catalog-admin/agent-templates", { method: "GET" });
+}
+
+export function registerAgentTemplate(msal: IPublicClientApplication, args: RegisterAgentTemplateArgs) {
+  return callApi<AdminAgentTemplate>(msal, "/catalog-admin/agent-templates", {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+}
+
+export function deleteAgentTemplate(msal: IPublicClientApplication, id: string) {
+  return callApi<{ deleted: string }>(msal, `/catalog-admin/agent-templates/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+// ---- Start page: public, department-filtered agent-template catalog ----
+
+export interface AgentTemplate {
+  id: string;
+  displayName: string;
+  department: string;
+  agentType: string;
+  pattern: string;
+  purpose: string;
+  modelPolicy: string;
+  dataClassification: string;
+  humanApproval: boolean;
+  externalSharing: boolean;
+  icon?: string;
+  description?: string;
+}
+
+export function listTemplates(msal: IPublicClientApplication) {
+  return callApi<{ templates: AgentTemplate[] }>(msal, "/templates", { method: "GET" }).then(
+    (res) => res.templates
+  );
+}
+
+// ---- Agent records: My Agents / Playground persistence ----
+// This is what survives a reload. Saving is best-effort and additive — it
+// never substitutes for the real catalog/policy revalidation that compile
+// and create-test-agent already perform.
+
+export type AgentStatus = "draft" | "compiled" | "dev_created" | "published" | "archived";
+
+export interface AgentRecordDto {
+  id: string;
+  owner: string;
+  status: AgentStatus;
+  coreDraft: CoreBlueprintDraft;
+  knowledgeSourceIds: string[];
+  toolIds: string[];
+  audienceIds: string[];
+  behavior: Record<string, unknown>;
+  blueprint?: Record<string, unknown>;
+  foundryPayload?: Record<string, unknown>;
+  policyEvaluation?: Record<string, unknown>;
+  foundryAgentName?: string;
+  foundryAgentVersion?: string;
+  templateId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentRecordInput {
+  id?: string;
+  status: AgentStatus;
+  coreDraft: CoreBlueprintDraft;
+  knowledgeSourceIds: string[];
+  toolIds: string[];
+  audienceIds: string[];
+  behavior?: Record<string, unknown>;
+  blueprint?: Record<string, unknown>;
+  foundryPayload?: Record<string, unknown>;
+  policyEvaluation?: Record<string, unknown>;
+  foundryAgentName?: string;
+  foundryAgentVersion?: string;
+  templateId?: string;
+}
+
+export function listAgents(msal: IPublicClientApplication, status?: AgentStatus) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return callApi<AgentRecordDto[]>(msal, `/agents${qs}`, { method: "GET" });
+}
+
+export function getAgent(msal: IPublicClientApplication, id: string) {
+  return callApi<AgentRecordDto>(msal, `/agents/${encodeURIComponent(id)}`, { method: "GET" });
+}
+
+export function saveAgent(msal: IPublicClientApplication, record: AgentRecordInput) {
+  return callApi<AgentRecordDto>(msal, "/agents", { method: "POST", body: JSON.stringify(record) });
+}

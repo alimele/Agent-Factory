@@ -13,6 +13,7 @@ from api.blueprint.blueprint_compiler import compile_blueprint, CatalogValidatio
 from api.blueprint.blueprint_schema import BehaviorOptions
 from api.blueprint.foundry_payload import to_foundry_agent_payload
 from api.blueprint.foundry_service import TestAgentRequest, create_test_agent, run_test_query
+from api.blueprint import template_registry
 from api.policy.engine import evaluate
 from api.policy.identity import build_context, TokenError
 from api.policy.models import Stage
@@ -26,11 +27,13 @@ from api.blueprint.catalog_mvp import (
 from api.blueprint.auth import get_requester, UnauthenticatedError
 from api.policy.routes import bp as policy_bp
 from api.admin.routes import bp as admin_bp
+from api.agents.routes import bp as agents_bp
 
 app = func.FunctionApp()
 
 app.register_functions(policy_bp)
 app.register_functions(admin_bp)
+app.register_functions(agents_bp)
 
 def _json_response(body: dict, status_code: int = 200) -> func.HttpResponse:
     return func.HttpResponse(json.dumps(body), status_code=status_code, mimetype="application/json")
@@ -38,6 +41,34 @@ def _json_response(body: dict, status_code: int = 200) -> func.HttpResponse:
 
 def _error_response(message: str, status_code: int) -> func.HttpResponse:
     return _json_response({"error": message}, status_code)
+
+
+# ---------------------------------------------------------------------------
+# Start page — agent-template catalog
+# ---------------------------------------------------------------------------
+@app.route(route="templates", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def list_agent_templates(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Public, department-filtered agent-template catalog for the Start page.
+    Uses the same requester_departments gate as /blueprint/catalog/{department}
+    and /blueprint/core below — a signed-in user only ever sees templates
+    for departments they're approved for. A template only pre-fills the
+    Stage 1 (Describe) fields; knowledge sources, tools, and audience are
+    still chosen from the live catalog on Configure, exactly as if the user
+    had typed the description by hand.
+    """
+    try:
+        context = build_context(req)
+    except TokenError as e:
+        return _error_response(str(e), 401)
+
+    try:
+        templates = template_registry.list_templates(context.requester_departments)
+    except Exception:
+        logging.exception("Failed to load agent templates")
+        return _error_response("Failed to load agent templates", 502)
+
+    return _json_response({"templates": templates})
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +138,7 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
     department, for the Knowledge/Actions pages to render as pickable
     options. No model call — a pure catalog lookup.
 
-    Gated to the requester's own department: build_context() reads their
+    Gated to the requester's own department(s): build_context() reads their
     Entra groups via GROUP_DEPARTMENT_MAP (api/policy/identity.py), the
     same mapping the PRE_DEPLOY policy gate's check_department() already
     relies on. Browsing another department's catalog is a 403, not just a
