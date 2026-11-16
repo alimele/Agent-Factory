@@ -93,6 +93,20 @@ def tools_for_department(department: str) -> dict[str, dict]:
             if department in depts and ready:
                 result[api.name] = {
                     "display_name": _properties(api).get("title", api.name),
+                    "description": (
+                        props.get("tooldescription")
+                        or _properties(api).get("summary")
+                        or _properties(api).get("description")
+                        or "No description provided."
+                    ),
+                    "capabilities": [
+                        item.strip()
+                        for item in str(props.get("toolcapabilities", "")).split(";")
+                        if item.strip()
+                    ],
+                    "access_mode": (
+                        props.get("toolaccessmode") or "read_write"
+                    ).strip().lower(),
                     "department": depts,
                     "risk": props.get("risk", "medium"),
                     "kind": "mcp" if _is_mcp(api) else "openapi",

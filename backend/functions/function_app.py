@@ -178,7 +178,7 @@ def blueprint_catalog(req: func.HttpRequest) -> func.HttpResponse:
             {"id": k, "displayName": v["display_name"]} for k, v in knowledge.items()
         ],
         "tools": [
-            {"id": k, "displayName": v["display_name"], "risk": v.get("risk")} for k, v in tools.items()
+            {"id": k, "displayName": v["display_name"], "description": v.get("description"), "capabilities": v.get("capabilities", []), "accessMode": v.get("access_mode", "read_write"), "risk": v.get("risk"), "requiresConnection": v.get("requires_connection", False), "kind": v.get("kind")} for k, v in tools.items()
         ],
         "audiences": [{"id": k} for k in AUDIENCES.keys() if k == own_audience_id],
     })

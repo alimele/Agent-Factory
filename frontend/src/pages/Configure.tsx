@@ -46,12 +46,22 @@ export default function Configure() {
     );
   }
 
-  function handleToolClick(t: { id: string; displayName: string; requiresConnection?: boolean }) {
+  function handleToolClick(t: { id: string; displayName: string; requiresConnection?: boolean; accessMode?: string; }) {
   const selected = selectedToolIds.includes(t.id);
   if (selected) {
     toggle(selectedToolIds, setSelectedToolIds, t.id); // deselecting always allowed
     return;
   }
+  
+  if (
+    t.accessMode !== "read_only" &&
+    !window.confirm(
+      "This tool may make changes to business systems. Do you want to add it?"
+    )
+  ) {
+    return;
+}
+
   if (t.requiresConnection && !toolConnections[t.id]) {
     setConnectingTool({ id: t.id, name: t.displayName }); // open form instead of selecting directly
     return;
@@ -143,7 +153,17 @@ export default function Configure() {
             return (
               <div key={t.id} className="row" style={{ cursor: "pointer" }} onClick={() => handleToolClick(t)}>
                 <span className={`check ${selected ? "on" : ""}`}>{selected ? "✓" : ""}</span>
-                <div className="rowMain"><b>{t.displayName}</b><small>Tool ID: {t.id}</small></div>
+                <div className="rowMain">
+                  <b>{t.displayName}</b>
+                  <small>{t.description}</small>
+                  {t.capabilities && t.capabilities.length > 0 && (
+                    <small>Capabilities: {t.capabilities.join(" · ")}</small>
+                  )}
+                  <small>
+                    {t.kind?.toUpperCase() ?? "TOOL"} ·{" "}
+                    {t.accessMode === "read_only" ? "Read only" : "Can make changes"}
+                  </small>
+                </div>
                 {connected && <span className="pill">Connected</span>}
                 {t.risk && <span className="pill">{t.risk} risk</span>}
               </div>

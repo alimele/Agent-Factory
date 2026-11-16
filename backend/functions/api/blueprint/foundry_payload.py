@@ -22,7 +22,7 @@ def _resolve_knowledge_tools(knowledge_source_ids: List[str]) -> tuple[List[Dict
 
 
 def to_foundry_agent_payload(
-    blueprint: AgentBlueprint, behavior: BehaviorOptions | None = None
+    blueprint: AgentBlueprint, behavior: BehaviorOptions | None = None, tool_connections: Dict[str, str] | None = None
 ) -> Dict[str, Any]:
     """
     behavior is optional only so existing offline callers (test_phase2.py)

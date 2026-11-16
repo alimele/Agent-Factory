@@ -69,6 +69,10 @@ export interface CoreBlueprintDraft {
 export interface CatalogItem {
   id: string;
   displayName: string;
+  description?: string;
+  capabilities?: string[];
+  accessMode?: string;
+  kind?: string;
   risk?: string;
   requiresConnection?: boolean;
 }
