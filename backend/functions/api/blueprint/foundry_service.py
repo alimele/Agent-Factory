@@ -119,8 +119,9 @@ def _openapi_auth(auth_config: dict[str, Any], tool_id: str) -> Any:
     raise ValueError(f"API Center tool '{tool_id}' uses unsupported auth type '{auth_type}'")
 
 
-def _build_tools(blueprint: AgentBlueprint) -> list[Any]:
+def _build_tools(blueprint: AgentBlueprint, tool_connections: dict[str, str] | None = None) -> list[Any]:
     tools: list[Any] = []
+    tool_connections = tool_connections or {}
 
     # This typed MCPTool configuration follows the working project smoke test
     # at scripts/test_foundry_iq_agent.py and the existing knowledge registry.
@@ -154,7 +155,7 @@ def _build_tools(blueprint: AgentBlueprint) -> list[Any]:
                     server_url=mcp["server_url"],
                     require_approval=mcp.get("require_approval", "never"),
                     allowed_tools=mcp.get("allowed_tools"),
-                    project_connection_id=mcp.get("project_connection_id"),
+                    project_connection_id=tool_connections.get(tool_id) or mcp.get("project_connection_id"),
                     headers=mcp.get("headers"),
                 )
             )
@@ -209,6 +210,7 @@ def _project_client() -> AIProjectClient:
 def create_test_agent(
     blueprint: AgentBlueprint,
     behavior: BehaviorOptions | None = None,
+    tool_connections: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Create a versioned, unpublished development agent from a validated blueprint."""
     behavior = behavior or BehaviorOptions()
@@ -219,7 +221,7 @@ def create_test_agent(
         definition = PromptAgentDefinition(
             model=deployment,
             instructions=build_instructions(blueprint, behavior),
-            tools=_build_tools(blueprint),
+            tools=_build_tools(blueprint, tool_connections),
         )
         agent = project.agents.create_version(
             agent_name=agent_name,

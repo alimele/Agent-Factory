@@ -167,6 +167,7 @@ export function compileBlueprint(
     audienceIds: string[];
     channels?: string[];
     behavior?: BehaviorPayload;
+    toolConnections?: Record<string,string>
   }
 ) {
   const { requestedBy, ...coreDraftFields } = args.coreDraft; // requestedBy is informational only, not part of the schema
@@ -179,6 +180,7 @@ export function compileBlueprint(
       audienceIds: args.audienceIds,
       channels: args.channels,
       behavior: args.behavior,
+      toolConnections: args.toolConnections,
     }),
   });
 }
@@ -192,6 +194,7 @@ export function createTestAgent(
     audienceIds: string[];
     channels?: string[];
     behavior: BehaviorPayload;
+    toolConnections?: Record<string,string>
   }
 ) {
   const { requestedBy, ...coreDraftFields } = args.coreDraft;
@@ -204,6 +207,7 @@ export function createTestAgent(
       audienceIds: args.audienceIds,
       channels: args.channels,
       behavior: args.behavior,
+      toolConnections: args.toolConnections,
     }),
   });
 }

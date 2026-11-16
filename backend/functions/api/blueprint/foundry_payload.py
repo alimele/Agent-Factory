@@ -32,10 +32,15 @@ def to_foundry_agent_payload(
     """
     tools: List[Dict[str, Any]] = []
     tool_resources: Dict[str, Any] = {}
+    tool_connections = tool_connections or {}
 
     # Action tools pass through from the catalog as-is (already Foundry-shaped)
     for tool_id in blueprint.tools:
-        tools.append(get_foundry_tool(tool_id))
+        tool = get_foundry_tool(tool_id)
+        conn_id = tool_connections.get(tool_id)
+        if conn_id and tool.get("type") == "mcp":
+            tool["mcp"]["project_connection_id"] = conn_id
+        tools.append(tool)
 
     # Knowledge sources resolve + merge into file_search / azure_ai_search tools
     if blueprint.knowledgeSources:

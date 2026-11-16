@@ -18,7 +18,7 @@ export default function ReviewLaunch() {
   const navigate = useNavigate();
   const {
     agentId, templateId, coreDraft, selectedKnowledgeIds, selectedToolIds, selectedAudienceIds,
-    behavior, createdAgent, setCreatedAgent,
+    behavior, createdAgent, setCreatedAgent, toolConnections,
   } = useBlueprint();
 
   const [busy, setBusy] = useState<"launch" | "test" | null>(null);
@@ -46,7 +46,7 @@ export default function ReviewLaunch() {
       setStage("Compiling blueprint…");
       const compiled = await compileBlueprint(instance, {
         coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds,
-        audienceIds: selectedAudienceIds, behavior,
+        audienceIds: selectedAudienceIds, behavior, toolConnections,
       });
 
       setStage("Running the governance policy gate…");
@@ -66,7 +66,7 @@ export default function ReviewLaunch() {
         setStage("Creating the development agent in Foundry…");
         const response = await createTestAgent(instance, {
           coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds,
-          audienceIds: selectedAudienceIds, behavior,
+          audienceIds: selectedAudienceIds, behavior, toolConnections,
         });
         setCreatedAgent(response.agent);
         if (agentId) {

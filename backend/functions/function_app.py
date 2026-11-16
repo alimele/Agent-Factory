@@ -256,6 +256,10 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
     except CatalogValidationError as e:
         return _error_response(str(e), 400)
 
+    tool_connections = body.get("toolConnections") or {}
+    if not isinstance(tool_connections, dict):
+        return _error_response("'toolConnections' must be an object", 400)
+
     behavior_raw = body.get("behavior") or {}
     if not isinstance(behavior_raw, dict):
         return _error_response("'behavior' must be a JSON object", 400)
@@ -264,7 +268,7 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
     except ValidationError as e:
         return _error_response(f"'behavior' failed validation: {e}", 400)
 
-    foundry_payload = to_foundry_agent_payload(blueprint, behavior)
+    foundry_payload = to_foundry_agent_payload(blueprint, behavior, tool_connections)
 
     return _json_response({
         "blueprint": blueprint.model_dump(),
@@ -334,6 +338,10 @@ def blueprint_create_test_agent(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as exc:
         logging.exception("Pre-deploy policy evaluation failed before Foundry creation")
         return _error_response("Pre-deploy policy evaluation failed; no Foundry agent was created", 502)
+    
+    tool_connections = body.get("toolConnections") or {}
+    if not isinstance(tool_connections, dict):
+        return _error_response("'toolConnections' must be an object", 400)
 
     policy_json = policy_result.model_dump(mode="json")
     if policy_result.overall_status.value == "fail":
@@ -343,7 +351,7 @@ def blueprint_create_test_agent(req: func.HttpRequest) -> func.HttpResponse:
         }, 403)
 
     try:
-        agent = create_test_agent(blueprint, behavior)
+        agent = create_test_agent(blueprint, behavior, tool_connections)
     except Exception:
         logging.exception("Foundry development agent creation failed")
         return _error_response(
