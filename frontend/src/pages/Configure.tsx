@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ToolConnectionModal from "../ToolConnectionModal";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useBlueprint } from "../BlueprintContext";
@@ -15,12 +16,14 @@ export default function Configure() {
     selectedToolIds, setSelectedToolIds,
     selectedAudienceIds, setSelectedAudienceIds,
     behavior, setBehavior,
+    toolConnections, setToolConnections
   } = useBlueprint();
 
   const [tab, setTab] = useState<Tab>("knowledge");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [connectingTool, setConnectingTool] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!coreDraft) return;
@@ -42,6 +45,19 @@ export default function Configure() {
       </section>
     );
   }
+
+  function handleToolClick(t: { id: string; displayName: string; requiresConnection?: boolean }) {
+  const selected = selectedToolIds.includes(t.id);
+  if (selected) {
+    toggle(selectedToolIds, setSelectedToolIds, t.id); // deselecting always allowed
+    return;
+  }
+  if (t.requiresConnection && !toolConnections[t.id]) {
+    setConnectingTool({ id: t.id, name: t.displayName }); // open form instead of selecting directly
+    return;
+  }
+  toggle(selectedToolIds, setSelectedToolIds, t.id);
+}
 
   function toggle(list: string[], setList: (v: string[]) => void, id: string) {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -123,10 +139,12 @@ export default function Configure() {
           )}
           {tools.map((t) => {
             const selected = selectedToolIds.includes(t.id);
+            const connected = !!toolConnections[t.id];
             return (
-              <div key={t.id} className="row" style={{ cursor: "pointer" }} onClick={() => toggle(selectedToolIds, setSelectedToolIds, t.id)}>
+              <div key={t.id} className="row" style={{ cursor: "pointer" }} onClick={() => handleToolClick(t)}>
                 <span className={`check ${selected ? "on" : ""}`}>{selected ? "✓" : ""}</span>
                 <div className="rowMain"><b>{t.displayName}</b><small>Tool ID: {t.id}</small></div>
+                {connected && <span className="pill">Connected</span>}
                 {t.risk && <span className="pill">{t.risk} risk</span>}
               </div>
             );
@@ -212,6 +230,18 @@ export default function Configure() {
           Review &amp; Launch →
         </button>
       </div>
+      {connectingTool && (
+        <ToolConnectionModal
+          toolId={connectingTool.id}
+          toolName={connectingTool.name}
+          onClose={() => setConnectingTool(null)}
+          onConnected={(connectionId) => {
+            setToolConnections({ ...toolConnections, [connectingTool.id]: connectionId });
+            setSelectedToolIds([...selectedToolIds, connectingTool.id]);
+            setConnectingTool(null);
+          }}
+        />
+      )}
     </section>
   );
 }

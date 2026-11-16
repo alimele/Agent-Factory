@@ -47,6 +47,8 @@ interface BlueprintState {
   setSelectedToolIds: (v: string[]) => void;
   selectedAudienceIds: string[];
   setSelectedAudienceIds: (v: string[]) => void;
+  toolConnections: Record<string, string>; // toolId -> connectionId
+  setToolConnections: (v: Record<string, string>) => void;
   behavior: BehaviorPreferences;
   setBehavior: (v: BehaviorPreferences) => void;
   compileResult: CompileResponse | null;
@@ -73,6 +75,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>([]);
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
+  const [toolConnections, setToolConnections] = useState<Record<string, string>>({});
   const [behavior, setBehavior] = useState<BehaviorPreferences>(defaultBehavior);
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
   const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(null);
@@ -86,6 +89,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
     setSelectedKnowledgeIds(record.knowledgeSourceIds);
     setSelectedToolIds(record.toolIds);
     setSelectedAudienceIds(record.audienceIds);
+    setToolConnections({});
     setBehavior({ ...defaultBehavior, ...(record.behavior as Partial<BehaviorPreferences>) });
     setCompileResult(
       record.blueprint && record.foundryPayload
@@ -117,6 +121,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
     setSelectedKnowledgeIds([]);
     setSelectedToolIds([]);
     setSelectedAudienceIds([]);
+    setToolConnections({});
     setBehavior(defaultBehavior);
     setCompileResult(null);
     setCreatedAgent(null);
@@ -128,7 +133,7 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
       agentId, setAgentId, templateId, setTemplateId,
       description, setDescription, coreDraft, setCoreDraft, catalog, setCatalog,
       selectedKnowledgeIds, setSelectedKnowledgeIds, selectedToolIds, setSelectedToolIds,
-      selectedAudienceIds, setSelectedAudienceIds, behavior, setBehavior,
+      selectedAudienceIds, setSelectedAudienceIds, toolConnections, setToolConnections, behavior, setBehavior,
       compileResult, setCompileResult, createdAgent, setCreatedAgent, agentCreated, setAgentCreated,
       loadRecord, resetForNewAgent,
     }}>

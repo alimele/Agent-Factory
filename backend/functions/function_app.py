@@ -28,6 +28,8 @@ from api.blueprint.auth import get_requester, UnauthenticatedError
 from api.policy.routes import bp as policy_bp
 from api.admin.routes import bp as admin_bp
 from api.agents.routes import bp as agents_bp
+from api.blueprint import tool_connections
+from api.blueprint import connection_manager
 
 app = func.FunctionApp()
 
@@ -381,3 +383,61 @@ def blueprint_test_agent(req: func.HttpRequest) -> func.HttpResponse:
         logging.exception("Foundry test query failed")
         return _error_response("The Foundry test query failed. Check Function App logs and the agent's connected tools.", 502)
     return _json_response(result)
+
+@app.route(route="blueprint/tools/{toolId}/schema", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def tool_connection_schema(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        get_requester(req)
+    except UnauthenticatedError as e:
+        return _error_response(str(e), 401)
+
+    tool_id = req.route_params.get("toolId")
+    try:
+        requester_departments = build_context(req).requester_departments
+    except TokenError:
+        requester_departments = []
+    # Same gate as /blueprint/catalog/{department} — don't leak a schema
+    # for a tool the user wouldn't even see in their own department's list.
+    if not any(tool_id in tools_for_department(d) for d in requester_departments):
+        return _error_response(f"You are not authorized to configure '{tool_id}'.", 403)
+
+    try:
+        schema = tool_connections.get_connection_schema(tool_id)
+    except tool_connections.SchemaValidationError as e:
+        return _error_response(str(e), 502)
+    except ValueError as e:
+        return _error_response(str(e), 404)
+    return _json_response({"toolId": tool_id, "fields": schema})
+
+
+@app.route(route="blueprint/tools/{toolId}/connect", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def tool_connect(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        requester = get_requester(req)
+    except UnauthenticatedError as e:
+        return _error_response(str(e), 401)
+
+    tool_id = req.route_params.get("toolId")
+    try:
+        requester_departments = build_context(req).requester_departments
+    except TokenError:
+        requester_departments = []
+    if not any(tool_id in tools_for_department(d) for d in requester_departments):
+        return _error_response(f"You are not authorized to configure '{tool_id}'.", 403)
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON", 400)
+    values = (body or {}).get("values", {})
+
+    try:
+        connection_id = tool_connections.create_tool_connection(tool_id, requester.email, values)
+    except tool_connections.SchemaValidationError as e:
+        return _error_response(str(e), 400)
+    except connection_manager.ConnectionPermissionError as e:
+        return _error_response(str(e), 403)
+    except connection_manager.ConnectionProvisioningError as e:
+        logging.exception("Tool connection provisioning failed")
+        return _error_response(str(e), 502)
+    return _json_response({"toolId": tool_id, "connectionId": connection_id}, 201)

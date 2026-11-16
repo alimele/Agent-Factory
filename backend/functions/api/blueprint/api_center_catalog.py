@@ -96,6 +96,7 @@ def tools_for_department(department: str) -> dict[str, dict]:
                     "department": depts,
                     "risk": props.get("risk", "medium"),
                     "kind": "mcp" if _is_mcp(api) else "openapi",
+                    "requires_connection": bool(props.get("connectionschema")),
                 }
     except HttpResponseError:
         logger.exception("API Center list failed for department=%s", department)
@@ -104,6 +105,18 @@ def tools_for_department(department: str) -> dict[str, dict]:
     _cache_set(_tool_cache, department, result, _CATALOG_CACHE_TTL_SECONDS)
     return result
 
+# tool_connections.py needs the raw asset, not just get_foundry_tool()'s slimmed output
+def get_api_asset(api_name: str):
+    client = _get_client()
+    try:
+        return client.apis.get(
+            resource_group_name=_RESOURCE_GROUP,
+            service_name=_SERVICE_NAME,
+            workspace_name=_WORKSPACE_NAME,
+            api_name=api_name,
+        )
+    except ResourceNotFoundError:
+        raise ValueError(f"API Center asset '{api_name}' not found")
 
 def approved_tool_ids(department: str) -> set[str]:
     """Used by policy/catalogs.py's approved_tool_ids() — same contract."""

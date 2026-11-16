@@ -12,9 +12,8 @@
     "APICENTER_WORKSPACE_NAME": "default",
     "AZURE_SUBSCRIPTION_ID": "",
     "APPCONFIG_ENDPOINT": "",
-    "TEMPLATE_KEY_PREFIX": "agent-templates/", #optional, this is the default
-    "COSMOS_ENDPOINT": "", #e.g. https://<account>.documents.azure.com:443/ — backs My Agents / Playground persistence
-    "COSMOS_DATABASE": "credo-factory", #optional, this is the default
-    "COSMOS_AGENTS_CONTAINER": "agents" #optional, this is the default
+     "STORAGE_TABLE_ENDPOINT": "",
+    "STORAGE_TABLE_NAME": "",
+    "LOCAL_DEV_MODE": "false"
 }
 }

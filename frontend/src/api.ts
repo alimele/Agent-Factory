@@ -70,6 +70,15 @@ export interface CatalogItem {
   id: string;
   displayName: string;
   risk?: string;
+  requiresConnection?: boolean;
+}
+
+export interface ToolConnectionField {
+  key: string;
+  label: string;
+  type: "string" | "number" | "secret";
+  required?: boolean;
+  default?: string | number;
 }
 
 export interface CatalogResponse {
@@ -132,6 +141,21 @@ export function getCatalogForDepartment(msal: IPublicClientApplication, departme
   return callApi<CatalogResponse>(msal, `/blueprint/catalog/${encodeURIComponent(department)}`, {
     method: "GET",
   });
+}
+
+export function getToolConnectionSchema(msal: IPublicClientApplication, toolId: string) {
+  return callApi<{ toolId: string; fields: ToolConnectionField[] }>(
+    msal, `/blueprint/tools/${encodeURIComponent(toolId)}/schema`, { method: "GET" }
+  );
+}
+
+export function connectTool(
+  msal: IPublicClientApplication, toolId: string, values: Record<string, string>
+) {
+  return callApi<{ toolId: string; connectionId: string }>(
+    msal, `/blueprint/tools/${encodeURIComponent(toolId)}/connect`,
+    { method: "POST", body: JSON.stringify({ values }) }
+  );
 }
 
 export function compileBlueprint(
