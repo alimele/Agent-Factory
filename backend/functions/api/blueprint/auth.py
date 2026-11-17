@@ -21,6 +21,8 @@ class Requester:
     email: str
     name: str | None = None
     roles: list[str] | None = None
+    tenant_id: str | None = None
+    object_id: str | None = None
 
 
 class UnauthenticatedError(Exception):
@@ -45,7 +47,23 @@ def get_requester(req) -> Requester:
         if not email:
             raise UnauthenticatedError("No email/upn claim found in principal")
 
-        return Requester(email=email, name=claims.get("userDetails"))
+        claim_values = {
+            c.get("typ"): c.get("val")
+            for c in claims.get("claims", [])
+        }
+
+        return Requester(
+            email=email,
+            name=claims.get("userDetails"),
+            tenant_id=(
+                claim_values.get("tid")
+                or claim_values.get("http://schemas.microsoft.com/identity/claims/tenantid")
+            ),
+            object_id=(
+                claim_values.get("oid")
+                or claim_values.get("http://schemas.microsoft.com/identity/claims/objectidentifier")
+            ),
+        )
 
     # Local dev only — must be explicitly opted into, never a silent default.
     if os.environ.get("LOCAL_DEV_MODE") == "true":
