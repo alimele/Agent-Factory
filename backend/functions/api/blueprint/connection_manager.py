@@ -252,6 +252,8 @@ def list_project_connections() -> list[dict[str, Any]]:
             "name": item.get("name"),
             "target": props.get("target"),
             "category": props.get("category"),
+            "authType": props.get("authType"),
+            "isSharedToAll": props.get("isSharedToAll"),
         })
     return result
 

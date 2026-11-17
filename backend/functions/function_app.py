@@ -30,6 +30,7 @@ from api.admin.routes import bp as admin_bp
 from api.agents.routes import bp as agents_bp
 from api.blueprint import tool_connections
 from api.blueprint import connection_manager
+from api.blueprint import mcp_client
 
 app = func.FunctionApp()
 
@@ -391,6 +392,99 @@ def blueprint_test_agent(req: func.HttpRequest) -> func.HttpResponse:
         logging.exception("Foundry test query failed")
         return _error_response("The Foundry test query failed. Check Function App logs and the agent's connected tools.", 502)
     return _json_response(result)
+
+
+@app.route(
+    route="blueprint/tools",
+    methods=["GET"],
+    auth_level=func.AuthLevel.ANONYMOUS,
+)
+def discover_project_tools(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Discover individual MCP operations from the current Foundry project.
+    Requires an authenticated CREDO user.
+    """
+
+    try:
+        get_requester(req)
+    except UnauthenticatedError as exc:
+        return _error_response(str(exc), 401)
+
+    try:
+        connections = connection_manager.list_project_connections()
+    except connection_manager.ConnectionPermissionError as exc:
+        return _error_response(str(exc), 403)
+    except connection_manager.ConnectionProvisioningError:
+        logging.exception("Could not list Foundry project connections")
+        return _error_response("Could not retrieve Foundry project connections", 502)
+
+    discovered_servers = []
+    errors = []
+
+    for connection in connections:
+        if (connection.get("category") or "").lower() != "remotetool":
+            continue
+
+        server = {
+            "connectionId": connection.get("name"),
+            "serverUrl": connection.get("target"),
+            "authType": connection.get("authType"),
+            "operations": [],
+            "status": "pending",
+        }
+
+        server_url = connection.get("target")
+
+        if not server_url:
+            server["status"] = "missing_endpoint"
+            errors.append({
+                "connectionId": connection.get("name"),
+                "error": "Connection has no target URL",
+            })
+            discovered_servers.append(server)
+            continue
+
+        try:
+            operations = mcp_client.discover_tools(server_url)
+            server["operations"] = operations
+            server["status"] = "discovered"
+
+        except PermissionError as exc:
+            server["status"] = "authentication_required"
+            errors.append({
+                "connectionId": connection.get("name"),
+                "error": str(exc),
+            })
+
+        except mcp_client.MCPDiscoveryError as exc:
+            server["status"] = "discovery_failed"
+            errors.append({
+                "connectionId": connection.get("name"),
+                "error": str(exc),
+            })
+
+        except Exception:
+            logging.exception(
+                "MCP discovery failed for connection %s",
+                connection.get("name"),
+            )
+            server["status"] = "discovery_failed"
+            errors.append({
+                "connectionId": connection.get("name"),
+                "error": "Unexpected MCP discovery error",
+            })
+
+        discovered_servers.append(server)
+
+    return _json_response({
+        "servers": discovered_servers,
+        "serverCount": len(discovered_servers),
+        "operationCount": sum(
+            len(server["operations"]) for server in discovered_servers
+        ),
+        "errors": errors,
+    })
+
 
 @app.route(route="blueprint/tools/{toolId}/schema", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def tool_connection_schema(req: func.HttpRequest) -> func.HttpResponse:
