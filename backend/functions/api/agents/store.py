@@ -57,7 +57,7 @@ def _to_entity(record: AgentRecord) -> dict:
     json_fields = [
         "coreDraft",
         "knowledgeSourceIds",
-        "toolIds",
+        "toolSelections",
         "audienceIds",
         "behavior",
         "blueprint",
@@ -86,7 +86,7 @@ def _to_record(entity: dict) -> AgentRecord:
     json_fields = [
         "coreDraft",
         "knowledgeSourceIds",
-        "toolIds",
+        "toolSelections",
         "audienceIds",
         "behavior",
         "blueprint",
@@ -97,9 +97,17 @@ def _to_record(entity: dict) -> AgentRecord:
         "templateId",
     ]
 
+    # Fields that default to an empty list on AgentRecord — fall back to "[]"
+    # for an entity written before that field existed (e.g. a pre-upgrade
+    # draft that still has the old "toolIds" column but no "toolSelections"),
+    # rather than passing None into a list-typed field and failing validation.
+    _list_fields = {"knowledgeSourceIds", "toolSelections", "audienceIds"}
     for field in json_fields:
         value = entity.get(field)
-        data[field] = json.loads(value) if value is not None else None
+        if value is None:
+            data[field] = [] if field in _list_fields else None
+        else:
+            data[field] = json.loads(value)
 
     return AgentRecord(**data)
 

@@ -85,6 +85,38 @@ export interface ToolConnectionField {
   default?: string | number;
 }
 
+// ---- Per-operation MCP tool discovery/selection ----
+
+export interface ToolOperation {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  risk?: string;
+}
+
+export type ToolDiscoveryStatus = "discovered" | "needs_connection" | "discovery_failed" | "not_configured";
+
+export interface ToolOperationsResponse {
+  toolId: string;
+  status: ToolDiscoveryStatus;
+  operations: ToolOperation[];
+  error?: string;
+}
+
+export interface ConnectToolResponse {
+  toolId: string;
+  connectionId: string;
+  operations: ToolOperation[];
+  discoveryStatus: ToolDiscoveryStatus;
+}
+
+/** One server + the individual operations selected on it — what the
+ * backend validates and the agent actually receives. */
+export interface ToolSelection {
+  serverId: string;
+  operations: string[];
+}
+
 export interface CatalogResponse {
   department: string;
   knowledgeSources: CatalogItem[];
@@ -153,10 +185,23 @@ export function getToolConnectionSchema(msal: IPublicClientApplication, toolId: 
   );
 }
 
+/** Individual MCP operations for one approved tool, grouped by server on
+ * the Tools tab. "needs_connection" means: don't call this again — open the
+ * connect form instead, whose success response already carries operations. */
+export function getToolOperations(
+  msal: IPublicClientApplication, department: string, toolId: string
+) {
+  return callApi<ToolOperationsResponse>(
+    msal,
+    `/blueprint/catalog/${encodeURIComponent(department)}/tools/${encodeURIComponent(toolId)}/operations`,
+    { method: "GET" }
+  );
+}
+
 export function connectTool(
   msal: IPublicClientApplication, toolId: string, values: Record<string, string>
 ) {
-  return callApi<{ toolId: string; connectionId: string }>(
+  return callApi<ConnectToolResponse>(
     msal, `/blueprint/tools/${encodeURIComponent(toolId)}/connect`,
     { method: "POST", body: JSON.stringify({ values }) }
   );
@@ -167,7 +212,7 @@ export function compileBlueprint(
   args: {
     coreDraft: CoreBlueprintDraft;
     knowledgeSourceIds: string[];
-    toolIds: string[];
+    toolSelections: ToolSelection[];
     audienceIds: string[];
     channels?: string[];
     behavior?: BehaviorPayload;
@@ -180,7 +225,7 @@ export function compileBlueprint(
     body: JSON.stringify({
       coreDraft: coreDraftFields,
       knowledgeSourceIds: args.knowledgeSourceIds,
-      toolIds: args.toolIds,
+      toolSelections: args.toolSelections,
       audienceIds: args.audienceIds,
       channels: args.channels,
       behavior: args.behavior,
@@ -194,7 +239,7 @@ export function createTestAgent(
   args: {
     coreDraft: CoreBlueprintDraft;
     knowledgeSourceIds: string[];
-    toolIds: string[];
+    toolSelections: ToolSelection[];
     audienceIds: string[];
     channels?: string[];
     behavior: BehaviorPayload;
@@ -207,7 +252,7 @@ export function createTestAgent(
     body: JSON.stringify({
       coreDraft: coreDraftFields,
       knowledgeSourceIds: args.knowledgeSourceIds,
-      toolIds: args.toolIds,
+      toolSelections: args.toolSelections,
       audienceIds: args.audienceIds,
       channels: args.channels,
       behavior: args.behavior,
@@ -392,7 +437,7 @@ export interface AgentRecordDto {
   status: AgentStatus;
   coreDraft: CoreBlueprintDraft;
   knowledgeSourceIds: string[];
-  toolIds: string[];
+  toolSelections: ToolSelection[];
   audienceIds: string[];
   behavior: Record<string, unknown>;
   blueprint?: Record<string, unknown>;
@@ -410,7 +455,7 @@ export interface AgentRecordInput {
   status: AgentStatus;
   coreDraft: CoreBlueprintDraft;
   knowledgeSourceIds: string[];
-  toolIds: string[];
+  toolSelections: ToolSelection[];
   audienceIds: string[];
   behavior?: BehaviorPayload;
   blueprint?: Record<string, unknown>;

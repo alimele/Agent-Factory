@@ -49,7 +49,10 @@ class AgentRecord(BaseModel):
 
     # Stage 2 manual picks
     knowledgeSourceIds: list[str] = Field(default_factory=list)
-    toolIds: list[str] = Field(default_factory=list)
+    # Per-server, per-operation tool selections — [{"serverId": "github",
+    # "operations": ["create_issue"]}, ...]. Replaces the old flat toolIds
+    # list of whole integrations; see blueprint_schema.ToolOperationSelection.
+    toolSelections: list[dict[str, Any]] = Field(default_factory=list)
     audienceIds: list[str] = Field(default_factory=list)
     behavior: dict[str, Any] = Field(default_factory=dict)
 

@@ -3,6 +3,7 @@ Dynamic tool catalog backed by Azure API Center.
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 import logging
@@ -289,6 +290,111 @@ def _get_foundry_openapi_tool(client: ApiCenterMgmtClient, api_name: str, api) -
             "auth": auth,
         },
     }
+
+
+def tool_risk(tool_id: str) -> str:
+    """The server's own `risk` custom property, independent of department —
+    used as the fallback risk for any operation without an `operationrisk`
+    override (tool_discovery.py, tool_connections.py)."""
+    api = get_api_asset(tool_id)
+    return (_custom_props(api).get("risk") or "medium")
+
+
+def operations_allowlist(tool_id: str) -> Optional[list[str]]:
+    """
+    Admin-declared governance CEILING on which MCP operations may ever be
+    selected for this server — reusing the existing `mcpallowedtools`
+    custom property, now interpreted as "at most these" rather than "always
+    exactly these". None means no admin-declared ceiling: every operation
+    discovery.discover_operations() actually finds on the live server is
+    selectable (still subject to the Agent-type / risk policy checks in
+    api/policy/rules.py). An empty discovered intersection is NOT the same
+    as "no tool" — callers should surface it as a configuration problem,
+    not silently drop the server.
+    """
+    api = get_api_asset(tool_id)
+    props = _custom_props(api)
+    raw = props.get("mcpallowedtools")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
+def operation_risk_overrides(tool_id: str) -> dict[str, str]:
+    """
+    Optional admin-declared per-operation risk, for finer-grained policy
+    than the whole-server `risk` custom property (requirement: "apply
+    security policies to individual operations, not just entire
+    integrations"). Custom property `operationrisk` is a JSON object
+    {"operationName": "low|medium|high|critical", ...}. Never guessed —
+    an operation missing from this map falls back to the server's own
+    `risk` property in api/policy/catalogs.py::operation_risk_levels().
+    """
+    api = get_api_asset(tool_id)
+    raw = _custom_props(api).get("operationrisk")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except (TypeError, ValueError):
+        logger.warning("Tool '%s' has an unparsable operationrisk custom property", tool_id)
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _shared_mcp_auth_headers(api) -> Optional[dict[str, str]]:
+    """
+    Headers this Function App can itself attach to a direct MCP request for
+    an admin-configured ("shared authentication") server — i.e. only the
+    `functionkey` auth mode, where the real secret lives in Key Vault via an
+    `@Microsoft.KeyVault(...)` app-setting reference and only the setting's
+    *name* is stored in API Center (see _get_foundry_mcp_tool's docstring).
+    `anonymous` needs no headers (returns {}). `connection`
+    (ProjectManagedIdentity) auth is resolved by Foundry's own managed
+    identity at agent-runtime, which this backend does not hold — callers
+    must treat that case as "not discoverable from here" rather than guess.
+    """
+    props = _custom_props(api)
+    auth_mode = (props.get("foundryauthmode") or "anonymous").strip()
+    if auth_mode == "anonymous":
+        return {}
+    if auth_mode == "functionkey":
+        env_var_name = props.get("foundryfunctionkeyenvvar")
+        key_value = os.environ.get(env_var_name, "") if env_var_name else ""
+        if not key_value:
+            raise ValueError(
+                f"MCP tool uses auth mode 'functionkey' but its key env var "
+                f"'{env_var_name}' is unset on this Function App"
+            )
+        return {"x-functions-key": key_value}
+    return None  # "connection", or anything else — not resolvable here
+
+
+def get_mcp_discovery_target(tool_id: str) -> tuple[str, dict[str, str]]:
+    """
+    (server_url, headers) this backend can use right now to call the live
+    MCP server's `tools/list` for an admin ("shared authentication") tool —
+    i.e. without needing a per-user connection first. Raises ValueError if
+    the tool isn't an MCP server, or uses an auth mode (`connection`) this
+    backend cannot resolve on its own; callers should treat that as
+    "discovery requires the user to connect first" (tool_connections.py) or
+    "discovery requires elevated admin access", not a bug.
+    """
+    client = _get_client()
+    api = get_api_asset(tool_id)
+    if not _is_mcp(api):
+        raise ValueError(f"Tool '{tool_id}' is not an MCP server (kind='{_properties(api).get('kind')}')")
+    headers = _shared_mcp_auth_headers(api)
+    if headers is None:
+        raise ValueError(
+            f"Tool '{tool_id}' uses the 'connection' auth mode, which this backend cannot "
+            "use for live discovery on its own (it relies on the Foundry project's own "
+            "managed identity at agent-runtime). Use per-user discovery via "
+            "tool_connections.discover_with_values() instead, or register this server with "
+            "foundryauthmode='functionkey' if an admin-shared secret is appropriate."
+        )
+    server_url = _runtime_uri(client, tool_id)
+    return server_url, headers
 
 
 def get_foundry_tool(api_name: str) -> dict:

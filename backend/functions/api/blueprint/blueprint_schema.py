@@ -8,12 +8,37 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
+class ToolOperationSelection(BaseModel):
+    """
+    One MCP server (an approved tool-catalog entry / API Center asset) plus
+    the individual operations the requester selected on it, e.g.
+    {"serverId": "github", "operations": ["create_issue", "list_issues"]}.
+
+    Replaces the old flat `tools: List[str]` (whole-integration selection).
+    `operations` is always a *subset* of what mcp_client.discover_tools()
+    actually returned for this server, re-validated server-side in
+    blueprint_compiler.compile_blueprint() — never trust what the client
+    echoes back. An empty `operations` list is rejected at compile time
+    (a server with nothing selected on it shouldn't be in `tools` at all).
+    """
+
+    serverId: str = Field(..., description="Tool-catalog id (API Center asset name) of the MCP server")
+    operations: List[str] = Field(
+        ..., min_length=1, description="MCP operation names selected on this server, from live tools/list discovery"
+    )
+
+    class Config:
+        extra = "forbid"
+
+
 class AgentBlueprint(BaseModel):
     """
     Mirrors the example in Project-Plan.docx section 5, with:
     - knowledgeSources / tools made explicitly optional (default [])
     - a few fields split into (NLP-generated) vs (server-set) — see
       blueprint_generator.py for which half of this the model actually fills in.
+    - tools is a list of ToolOperationSelection (per-server, per-operation),
+      not a flat list of tool-catalog ids — see that model's docstring.
     """
 
     # --- Stage 1: LLM-generated from the Describe-page text (blueprint_generator.py).
@@ -41,9 +66,9 @@ class AgentBlueprint(BaseModel):
         default_factory=list,
         description="Approved knowledge-catalog IDs. Empty if the agent needs no grounding.",
     )
-    tools: List[str] = Field(
+    tools: List[ToolOperationSelection] = Field(
         default_factory=list,
-        description="Approved tool-catalog IDs. Empty if the agent takes no actions.",
+        description="Approved tool-catalog servers with the individual operations selected on each. Empty if the agent takes no actions.",
     )
     audience: List[str] = Field(..., description="Entra groups / named audiences, from the approved audience catalog")
     channels: List[str] = Field(default_factory=lambda: ["Teams"])

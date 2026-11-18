@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
-import { getToolConnectionSchema, connectTool, ToolConnectionField } from "./api";
+import { getToolConnectionSchema, connectTool, ToolConnectionField, ToolOperation, ToolDiscoveryStatus } from "./api";
 
 export default function ToolConnectionModal({
   toolId, toolName, onClose, onConnected,
 }: {
   toolId: string; toolName: string;
   onClose: () => void;
-  onConnected: (connectionId: string) => void;
+  // operations/discoveryStatus come from a live tools/list call made with
+  // the values just submitted below (backend: tool_connections.py's
+  // create_tool_connection -> discover_with_values), so the Tools tab can
+  // offer individual operations to pick immediately after connecting.
+  onConnected: (connectionId: string, operations: ToolOperation[], discoveryStatus: ToolDiscoveryStatus) => void;
 }) {
   const { instance } = useMsal();
   const [fields, setFields] = useState<ToolConnectionField[] | null>(null);
@@ -31,7 +35,7 @@ export default function ToolConnectionModal({
     setError(null);
     try {
       const res = await connectTool(instance, toolId, values);
-      onConnected(res.connectionId);
+      onConnected(res.connectionId, res.operations, res.discoveryStatus);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Connection failed");
     } finally {

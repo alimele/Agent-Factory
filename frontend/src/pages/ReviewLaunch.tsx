@@ -17,7 +17,7 @@ export default function ReviewLaunch() {
   const { instance } = useMsal();
   const navigate = useNavigate();
   const {
-    agentId, templateId, coreDraft, selectedKnowledgeIds, selectedToolIds, selectedAudienceIds,
+    agentId, templateId, coreDraft, selectedKnowledgeIds, toolSelections, selectedAudienceIds,
     behavior, createdAgent, setCreatedAgent, toolConnections,
   } = useBlueprint();
 
@@ -45,7 +45,7 @@ export default function ReviewLaunch() {
     try {
       setStage("Compiling blueprint…");
       const compiled = await compileBlueprint(instance, {
-        coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds,
+        coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolSelections,
         audienceIds: selectedAudienceIds, behavior, toolConnections,
       });
 
@@ -56,7 +56,7 @@ export default function ReviewLaunch() {
       if (agentId) {
         await saveAgent(instance, {
           id: agentId, status: "compiled", coreDraft: coreDraft!,
-          knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds, audienceIds: selectedAudienceIds,
+          knowledgeSourceIds: selectedKnowledgeIds, toolSelections, audienceIds: selectedAudienceIds,
           behavior, blueprint: compiled.blueprint, foundryPayload: compiled.foundryPayload,
           policyEvaluation: evaluation, templateId: templateId ?? undefined,
         });
@@ -65,14 +65,14 @@ export default function ReviewLaunch() {
       if (evaluation.overall_status !== "fail") {
         setStage("Creating the development agent in Foundry…");
         const response = await createTestAgent(instance, {
-          coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds,
+          coreDraft: coreDraft!, knowledgeSourceIds: selectedKnowledgeIds, toolSelections,
           audienceIds: selectedAudienceIds, behavior, toolConnections,
         });
         setCreatedAgent(response.agent);
         if (agentId) {
           await saveAgent(instance, {
             id: agentId, status: "dev_created", coreDraft: coreDraft!,
-            knowledgeSourceIds: selectedKnowledgeIds, toolIds: selectedToolIds, audienceIds: selectedAudienceIds,
+            knowledgeSourceIds: selectedKnowledgeIds, toolSelections, audienceIds: selectedAudienceIds,
             behavior, blueprint: compiled.blueprint, foundryPayload: compiled.foundryPayload,
             policyEvaluation: evaluation, templateId: templateId ?? undefined,
             foundryAgentName: response.agent.name, foundryAgentVersion: response.agent.version,
@@ -110,7 +110,7 @@ export default function ReviewLaunch() {
       <div className="summaryGrid">
         <div className="summaryCard"><span>Department</span><strong>{coreDraft.department}</strong></div>
         <div className="summaryCard"><span>Knowledge</span><strong>{selectedKnowledgeIds.length} source(s)</strong></div>
-        <div className="summaryCard"><span>Tools</span><strong>{selectedToolIds.length} tool(s)</strong></div>
+        <div className="summaryCard"><span>Tools</span><strong>{toolSelections.reduce((n, s) => n + s.operations.length, 0)} operation(s) across {toolSelections.length} tool(s)</strong></div>
         <div className="summaryCard"><span>Audience</span><strong>{selectedAudienceIds.length} group(s)</strong></div>
       </div>
       <div className="card reviewPurpose"><span className="label">Purpose</span><p>{coreDraft.purpose}</p></div>

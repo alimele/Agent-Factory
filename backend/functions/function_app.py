@@ -31,6 +31,7 @@ from api.agents.routes import bp as agents_bp
 from api.blueprint import tool_connections
 from api.blueprint import connection_manager
 from api.blueprint import mcp_client
+from api.blueprint import tool_discovery
 
 app = func.FunctionApp()
 
@@ -245,11 +246,15 @@ def blueprint_compile(req: func.HttpRequest) -> func.HttpResponse:
             403,
         )
 
+    tool_selections = body.get("toolSelections", [])
+    if not isinstance(tool_selections, list):
+        return _error_response("'toolSelections' must be an array of {serverId, operations}", 400)
+
     try:
         blueprint = compile_blueprint(
             core_draft=core_draft,
             knowledge_source_ids=body.get("knowledgeSourceIds", []),
-            tool_ids=body.get("toolIds", []),
+            tool_selections=tool_selections,
             audience_ids=body.get("audienceIds", []),
             requester_email=requester.email,
             channels=body.get("channels"),
@@ -292,11 +297,15 @@ def _validated_blueprint_for_foundry(body: dict, requester_email: str):
     except ValidationError as exc:
         raise ValueError(f"coreDraft failed validation: {exc}") from exc
 
+    tool_selections = body.get("toolSelections", [])
+    if not isinstance(tool_selections, list):
+        raise ValueError("'toolSelections' must be an array of {serverId, operations}")
+
     try:
         return compile_blueprint(
             core_draft=core_draft,
             knowledge_source_ids=body.get("knowledgeSourceIds", []),
-            tool_ids=body.get("toolIds", []),
+            tool_selections=tool_selections,
             audience_ids=body.get("audienceIds", []),
             requester_email=requester_email,
             channels=body.get("channels"),
@@ -401,8 +410,15 @@ def blueprint_test_agent(req: func.HttpRequest) -> func.HttpResponse:
 )
 def discover_project_tools(req: func.HttpRequest) -> func.HttpResponse:
     """
-    Discover individual MCP operations from the current Foundry project.
-    Requires an authenticated CREDO user.
+    Project-wide diagnostic: discovers MCP operations across every
+    RemoteTool connection currently on the Foundry project, regardless of
+    department/catalog. Not used by the Tools page — the Configure page's
+    per-tool, department-scoped discovery is
+    GET /blueprint/catalog/{department}/tools/{toolId}/operations
+    (tool_discovery.py), which only exposes operations for tools actually
+    approved for the requester's department. Kept here for admins
+    troubleshooting a connection end-to-end. Requires an authenticated
+    CREDO user.
     """
 
     try:
@@ -534,7 +550,7 @@ def tool_connect(req: func.HttpRequest) -> func.HttpResponse:
     values = (body or {}).get("values", {})
 
     try:
-        connection_id = tool_connections.create_tool_connection(tool_id, requester.email, values)
+        result = tool_connections.create_tool_connection(tool_id, requester.email, values)
     except tool_connections.SchemaValidationError as e:
         return _error_response(str(e), 400)
     except connection_manager.ConnectionPermissionError as e:
@@ -542,4 +558,52 @@ def tool_connect(req: func.HttpRequest) -> func.HttpResponse:
     except connection_manager.ConnectionProvisioningError as e:
         logging.exception("Tool connection provisioning failed")
         return _error_response(str(e), 502)
-    return _json_response({"toolId": tool_id, "connectionId": connection_id}, 201)
+    # result = {"connectionId", "operations", "discoveryStatus"} — operations
+    # comes from a live tools/list call made with the values just submitted
+    # (tool_connections.discover_with_values), so the Tools page can offer
+    # individual operations to select immediately, in the same round trip
+    # that establishes the connection.
+    return _json_response({"toolId": tool_id, **result}, 201)
+
+
+@app.route(
+    route="blueprint/catalog/{department}/tools/{toolId}/operations",
+    methods=["GET"],
+    auth_level=func.AuthLevel.ANONYMOUS,
+)
+def tool_operations(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Individual MCP operations for one approved tool, grouped under that
+    tool/server (the Tools page groups servers itself; this just answers
+    "what can I pick on this one server"). Same department-authorization
+    gate as /blueprint/catalog/{department} and the schema/connect routes.
+
+    For a shared-auth server this discovers live right away. For an
+    individually-authenticated server it returns status="needs_connection"
+    — the frontend should open the same connect form
+    (/blueprint/tools/{toolId}/schema + /connect) it already uses, whose
+    POST /connect response carries the discovered operations on success.
+    """
+    try:
+        get_requester(req)
+    except UnauthenticatedError as e:
+        return _error_response(str(e), 401)
+
+    department = req.route_params.get("department")
+    tool_id = req.route_params.get("toolId")
+    if department not in DEPARTMENTS:
+        return _error_response(f"Unknown department '{department}'", 404)
+
+    try:
+        requester_departments = build_context(req).requester_departments
+    except TokenError:
+        requester_departments = []
+    if department not in requester_departments:
+        return _error_response(f"You are not authorized to view the '{department}' catalog.", 403)
+
+    department_tools = tools_for_department(department)
+    if tool_id not in department_tools:
+        return _error_response(f"'{tool_id}' is not an approved tool for '{department}'.", 404)
+
+    result = tool_discovery.discover_operations(tool_id)
+    return _json_response({"toolId": tool_id, **result})

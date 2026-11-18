@@ -55,11 +55,15 @@ def test_knowledge_and_action_three_stage():
     check("HR actions page shows the ServiceNow tool", "ServiceNow-Create-HR-Request" in available_tools)
     check("HR actions page does NOT show the IT ticket tool", "ServiceNow-Create-IT-Ticket" not in available_tools)
 
-    # user picks from what was shown
+    # user picks from what was shown. ServiceNow-Create-HR-Request is an
+    # OpenAPI-kind tool (not MCP), so there's no individual-operation
+    # discovery to pick from — see foundry_service.py's _build_tools()
+    # comment on why OpenAPI selections carry a single "*" (whole spec)
+    # placeholder rather than a real discovered operation name.
     bp = compile_blueprint(
         core_draft=core,
         knowledge_source_ids=["HR-SharePoint-Leave"],
-        tool_ids=["ServiceNow-Create-HR-Request"],
+        tool_selections=[{"serverId": "ServiceNow-Create-HR-Request", "operations": ["*"]}],
         audience_ids=[],
         requester_email="user@customer.com",
     )
@@ -84,7 +88,7 @@ def test_rejects_unapproved_id():
         compile_blueprint(
             core_draft=core,
             knowledge_source_ids=[],
-            tool_ids=["Not-A-Real-Tool"],  # e.g. a tampered request
+            tool_selections=[{"serverId": "Not-A-Real-Tool", "operations": ["*"]}],  # e.g. a tampered request
             audience_ids=[],
             requester_email="user@customer.com",
         )
@@ -104,7 +108,7 @@ def test_knowledge_only_no_tools():
     bp = compile_blueprint(
         core_draft=core,
         knowledge_source_ids=["Finance-SharePoint-Policies"],
-        tool_ids=[],
+        tool_selections=[],
         audience_ids=[],
         requester_email="user@customer.com",
     )

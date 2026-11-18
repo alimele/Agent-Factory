@@ -3,9 +3,11 @@ import ToolConnectionModal from "../ToolConnectionModal";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { useBlueprint } from "../BlueprintContext";
-import { getCatalogForDepartment, saveAgent } from "../api";
+import { getCatalogForDepartment, getToolOperations, saveAgent } from "../api";
 
 type Tab = "knowledge" | "tools" | "behavior" | "security";
+
+const WRITE_RISKS = new Set(["medium", "high", "critical"]);
 
 export default function Configure() {
   const { instance } = useMsal();
@@ -13,7 +15,8 @@ export default function Configure() {
   const {
     agentId, templateId, coreDraft, catalog, setCatalog,
     selectedKnowledgeIds, setSelectedKnowledgeIds,
-    selectedToolIds, setSelectedToolIds,
+    toolSelections, setToolOperations,
+    toolDiscovery, setToolDiscovery,
     selectedAudienceIds, setSelectedAudienceIds,
     behavior, setBehavior,
     toolConnections, setToolConnections
@@ -24,6 +27,10 @@ export default function Configure() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [connectingTool, setConnectingTool] = useState<{ id: string; name: string } | null>(null);
+  const [expandedToolId, setExpandedToolId] = useState<string | null>(null);
+  const [discoveringToolId, setDiscoveringToolId] = useState<string | null>(null);
+
+  const operationsFor = (toolId: string) => toolSelections.find((s) => s.serverId === toolId)?.operations ?? [];
 
   useEffect(() => {
     if (!coreDraft) return;
@@ -46,28 +53,47 @@ export default function Configure() {
     );
   }
 
-  function handleToolClick(t: { id: string; displayName: string; requiresConnection?: boolean; accessMode?: string; }) {
-  const selected = selectedToolIds.includes(t.id);
-  if (selected) {
-    toggle(selectedToolIds, setSelectedToolIds, t.id); // deselecting always allowed
-    return;
-  }
-  
-  if (
-    t.accessMode !== "read_only" &&
-    !window.confirm(
-      "This tool may make changes to business systems. Do you want to add it?"
-    )
-  ) {
-    return;
-}
+  // Expanding a server shows its individual operations instead of selecting
+  // the whole integration (requirement: per-operation discovery/selection,
+  // grouped by server). An individually-authenticated server that hasn't
+  // been connected yet opens the connect form directly — its success
+  // response already carries the discovered operations, so there's no
+  // separate discovery round trip for that case.
+  async function handleToolExpand(t: { id: string; displayName: string; requiresConnection?: boolean }) {
+    if (expandedToolId === t.id) {
+      setExpandedToolId(null);
+      return;
+    }
+    setExpandedToolId(t.id);
+    if (toolDiscovery[t.id]) return; // already discovered or already known to need a connection
 
-  if (t.requiresConnection && !toolConnections[t.id]) {
-    setConnectingTool({ id: t.id, name: t.displayName }); // open form instead of selecting directly
-    return;
+    if (t.requiresConnection && !toolConnections[t.id]) {
+      setToolDiscovery({ ...toolDiscovery, [t.id]: { toolId: t.id, status: "needs_connection", operations: [] } });
+      return;
+    }
+
+    setDiscoveringToolId(t.id);
+    try {
+      const res = await getToolOperations(instance, coreDraft!.department, t.id);
+      setToolDiscovery({ ...toolDiscovery, [t.id]: res });
+    } catch (e) {
+      setToolDiscovery({
+        ...toolDiscovery,
+        [t.id]: { toolId: t.id, status: "discovery_failed", operations: [], error: e instanceof Error ? e.message : "Discovery failed" },
+      });
+    } finally {
+      setDiscoveringToolId(null);
+    }
   }
-  toggle(selectedToolIds, setSelectedToolIds, t.id);
-}
+
+  function toggleOperation(toolId: string, opName: string, opRisk: string | undefined) {
+    const current = operationsFor(toolId);
+    const selected = current.includes(opName);
+    if (!selected && WRITE_RISKS.has((opRisk ?? "medium").toLowerCase())) {
+      if (!window.confirm(`"${opName}" may make changes to business systems (risk: ${opRisk}). Add it?`)) return;
+    }
+    setToolOperations(toolId, selected ? current.filter((o) => o !== opName) : [...current, opName]);
+  }
 
   function toggle(list: string[], setList: (v: string[]) => void, id: string) {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -82,7 +108,7 @@ export default function Configure() {
         status: "draft",
         coreDraft: coreDraft!,
         knowledgeSourceIds: selectedKnowledgeIds,
-        toolIds: selectedToolIds,
+        toolSelections,
         audienceIds: selectedAudienceIds,
         behavior,
         templateId: templateId ?? undefined,
@@ -101,7 +127,7 @@ export default function Configure() {
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "knowledge", label: "Knowledge", count: selectedKnowledgeIds.length },
-    { id: "tools", label: "Tools", count: selectedToolIds.length },
+    { id: "tools", label: "Tools", count: toolSelections.reduce((n, s) => n + s.operations.length, 0) },
     { id: "behavior", label: "Behavior", count: 0 },
     { id: "security", label: "Security & Audience", count: selectedAudienceIds.length },
   ];
@@ -148,24 +174,86 @@ export default function Configure() {
             <div className="emptyState"><strong>No approved tools yet</strong><p>for {coreDraft.department}.</p></div>
           )}
           {tools.map((t) => {
-            const selected = selectedToolIds.includes(t.id);
+            const opsSelected = operationsFor(t.id);
             const connected = !!toolConnections[t.id];
+            const expanded = expandedToolId === t.id;
+            const discovery = toolDiscovery[t.id];
             return (
-              <div key={t.id} className="row" style={{ cursor: "pointer" }} onClick={() => handleToolClick(t)}>
-                <span className={`check ${selected ? "on" : ""}`}>{selected ? "✓" : ""}</span>
-                <div className="rowMain">
-                  <b>{t.displayName}</b>
-                  <small>{t.description}</small>
-                  {t.capabilities && t.capabilities.length > 0 && (
-                    <small>Capabilities: {t.capabilities.join(" · ")}</small>
-                  )}
-                  <small>
-                    {t.kind?.toUpperCase() ?? "TOOL"} ·{" "}
-                    {t.accessMode === "read_only" ? "Read only" : "Can make changes"}
-                  </small>
+              <div key={t.id} className="toolGroup">
+                <div className="row" style={{ cursor: "pointer" }} onClick={() => handleToolExpand(t)}>
+                  <span className={`check ${opsSelected.length > 0 ? "on" : ""}`}>{opsSelected.length > 0 ? "✓" : ""}</span>
+                  <div className="rowMain">
+                    <b>{t.displayName}</b>
+                    <small>{t.description}</small>
+                    {t.capabilities && t.capabilities.length > 0 && (
+                      <small>Capabilities: {t.capabilities.join(" · ")}</small>
+                    )}
+                    <small>
+                      {t.kind?.toUpperCase() ?? "TOOL"} ·{" "}
+                      {t.accessMode === "read_only" ? "Read only" : "Can make changes"}
+                    </small>
+                  </div>
+                  {opsSelected.length > 0 && <span className="pill">{opsSelected.length} operation(s)</span>}
+                  {connected && <span className="pill">Connected</span>}
+                  {t.risk && <span className="pill">{t.risk} risk</span>}
+                  <span aria-hidden>{expanded ? "▲" : "▼"}</span>
                 </div>
-                {connected && <span className="pill">Connected</span>}
-                {t.risk && <span className="pill">{t.risk} risk</span>}
+
+                {expanded && (
+                  <div className="toolOperations" style={{ paddingLeft: 36, paddingBottom: 12 }}>
+                    {discoveringToolId === t.id && <small>Discovering operations on {t.displayName}…</small>}
+
+                    {discovery?.status === "needs_connection" && (
+                      <div className="notice">
+                        <p>Connect to {t.displayName} to see and select its individual operations.</p>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => setConnectingTool({ id: t.id, name: t.displayName })}
+                        >
+                          Connect…
+                        </button>
+                      </div>
+                    )}
+
+                    {discovery?.status === "not_configured" && (
+                      <div className="notice">
+                        Connected — an administrator still needs to enable live operation discovery for{" "}
+                        {t.displayName} (declare a connectionheadermap) before individual operations can be listed here.
+                      </div>
+                    )}
+
+                    {discovery?.status === "discovery_failed" && (
+                      <div className="notice errorNotice">
+                        Couldn't reach {t.displayName}'s server{discovery.error ? `: ${discovery.error}` : "."}
+                      </div>
+                    )}
+
+                    {discovery?.status === "discovered" && discovery.operations.length === 0 && (
+                      <div className="notice">No operations were returned by {t.displayName}'s server.</div>
+                    )}
+
+                    {discovery?.status === "discovered" && discovery.operations.map((op) => {
+                      const checked = opsSelected.includes(op.name);
+                      return (
+                        <label key={op.name} className="ruleRow" style={{ cursor: "pointer" }}>
+                          <span>
+                            <strong>{op.name}</strong>
+                            <small>{op.description}</small>
+                          </span>
+                          {op.risk && <span className="pill">{op.risk} risk</span>}
+                          <input
+                            className="toggleCheck"
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleOperation(t.id, op.name, op.risk)}
+                            aria-label={`Select operation ${op.name} on ${t.displayName}`}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -255,9 +343,20 @@ export default function Configure() {
           toolId={connectingTool.id}
           toolName={connectingTool.name}
           onClose={() => setConnectingTool(null)}
-          onConnected={(connectionId) => {
+          onConnected={(connectionId, operations, discoveryStatus) => {
             setToolConnections({ ...toolConnections, [connectingTool.id]: connectionId });
-            setSelectedToolIds([...selectedToolIds, connectingTool.id]);
+            // Operations discovered live with the credentials just submitted
+            // (tool_connections.create_tool_connection) — the user still has
+            // to pick which ones the agent gets; connecting alone selects none.
+            setToolDiscovery({
+              ...toolDiscovery,
+              [connectingTool.id]: {
+                toolId: connectingTool.id,
+                status: discoveryStatus === "discovered" ? "discovered" : discoveryStatus,
+                operations,
+              },
+            });
+            setExpandedToolId(connectingTool.id);
             setConnectingTool(null);
           }}
         />

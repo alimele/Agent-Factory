@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
-import { CoreBlueprintDraft, CatalogResponse, CompileResponse, CreatedAgent, AgentRecordDto } from "./api";
+import { CoreBlueprintDraft, CatalogResponse, CompileResponse, CreatedAgent, AgentRecordDto, ToolSelection, ToolOperationsResponse } from "./api";
 
 export interface BehaviorPreferences {
   instructions: string;
@@ -43,11 +43,24 @@ interface BlueprintState {
   setCatalog: (v: CatalogResponse | null) => void;
   selectedKnowledgeIds: string[];
   setSelectedKnowledgeIds: (v: string[]) => void;
-  selectedToolIds: string[];
-  setSelectedToolIds: (v: string[]) => void;
+  // Per-server, per-operation tool selections — what's actually sent as
+  // the blueprint's `tools` and what the agent receives. A server with an
+  // empty `operations` array is a server the user has opened/connected but
+  // not yet picked any operation on, kept in state only while the Tools
+  // tab accordion is building it up — setToolOperations prunes it to [] on
+  // submit so it never reaches compile/create-test-agent with 0 operations.
+  toolSelections: ToolSelection[];
+  setToolSelections: (v: ToolSelection[]) => void;
+  /** Replace the operations selected for one server, adding or removing it from toolSelections as needed. */
+  setToolOperations: (serverId: string, operations: string[]) => void;
+  // Session cache of each server's discovery result (operations list, or
+  // needs_connection/discovery_failed status), so switching Configure tabs
+  // doesn't re-trigger a discovery call for a server already opened once.
+  toolDiscovery: Record<string, ToolOperationsResponse>;
+  setToolDiscovery: (v: Record<string, ToolOperationsResponse>) => void;
   selectedAudienceIds: string[];
   setSelectedAudienceIds: (v: string[]) => void;
-  toolConnections: Record<string, string>; // toolId -> connectionId
+  toolConnections: Record<string, string>; // serverId -> connectionId
   setToolConnections: (v: Record<string, string>) => void;
   behavior: BehaviorPreferences;
   setBehavior: (v: BehaviorPreferences) => void;
@@ -73,9 +86,17 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
   const [coreDraft, setCoreDraft] = useState<CoreBlueprintDraft | null>(null);
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [selectedKnowledgeIds, setSelectedKnowledgeIds] = useState<string[]>([]);
-  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
+  const [toolSelections, setToolSelections] = useState<ToolSelection[]>([]);
+  const [toolDiscovery, setToolDiscovery] = useState<Record<string, ToolOperationsResponse>>({});
   const [selectedAudienceIds, setSelectedAudienceIds] = useState<string[]>([]);
   const [toolConnections, setToolConnections] = useState<Record<string, string>>({});
+
+  function setToolOperations(serverId: string, operations: string[]) {
+    setToolSelections((prev) => {
+      const without = prev.filter((s) => s.serverId !== serverId);
+      return operations.length > 0 ? [...without, { serverId, operations }] : without;
+    });
+  }
   const [behavior, setBehavior] = useState<BehaviorPreferences>(defaultBehavior);
   const [compileResult, setCompileResult] = useState<CompileResponse | null>(null);
   const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(null);
@@ -87,8 +108,12 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
     setCoreDraft(record.coreDraft);
     setCatalog(null); // force a fresh department catalog fetch on Configure
     setSelectedKnowledgeIds(record.knowledgeSourceIds);
-    setSelectedToolIds(record.toolIds);
+    setToolSelections(record.toolSelections ?? []);
+    setToolDiscovery({});
     setSelectedAudienceIds(record.audienceIds);
+    // Per-user tool connections aren't reusable across sessions/devices by
+    // this backend by design (see tool_connections.py) — the user
+    // reconnects on resume, which also re-runs discovery for that server.
     setToolConnections({});
     setBehavior({ ...defaultBehavior, ...(record.behavior as Partial<BehaviorPreferences>) });
     setCompileResult(
@@ -119,7 +144,8 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
     setCoreDraft(null);
     setCatalog(null);
     setSelectedKnowledgeIds([]);
-    setSelectedToolIds([]);
+    setToolSelections([]);
+    setToolDiscovery({});
     setSelectedAudienceIds([]);
     setToolConnections({});
     setBehavior(defaultBehavior);
@@ -132,7 +158,8 @@ export function BlueprintProvider({ children }: { children: ReactNode }) {
     <BlueprintContext.Provider value={{
       agentId, setAgentId, templateId, setTemplateId,
       description, setDescription, coreDraft, setCoreDraft, catalog, setCatalog,
-      selectedKnowledgeIds, setSelectedKnowledgeIds, selectedToolIds, setSelectedToolIds,
+      selectedKnowledgeIds, setSelectedKnowledgeIds,
+      toolSelections, setToolSelections, setToolOperations, toolDiscovery, setToolDiscovery,
       selectedAudienceIds, setSelectedAudienceIds, toolConnections, setToolConnections, behavior, setBehavior,
       compileResult, setCompileResult, createdAgent, setCreatedAgent, agentCreated, setAgentCreated,
       loadRecord, resetForNewAgent,

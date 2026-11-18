@@ -137,11 +137,14 @@ def _build_tools(blueprint: AgentBlueprint, tool_connections: dict[str, str] | N
             )
         )
 
-    # Resolve only IDs selected by the user and revalidated against API
-    # Center. Each one resolves to either an OpenAPI tool or an MCP server
-    # tool — api_center_catalog.py::get_foundry_tool() tags which with a
-    # "type" discriminator, mirroring the knowledge-source MCP tools above.
-    for tool_id in blueprint.tools:
+    # Resolve only (server, operations) selections the user picked and
+    # blueprint_compiler.py already revalidated against live MCP discovery /
+    # the admin's operations_allowlist ceiling. Each server resolves to
+    # either an OpenAPI tool or an MCP server tool — api_center_catalog.py
+    # ::get_foundry_tool() tags which with a "type" discriminator, mirroring
+    # the knowledge-source MCP tools above.
+    for selection in blueprint.tools:
+        tool_id = selection.serverId
         config = get_foundry_tool(tool_id)
         tool_type = config.get("type")
 
@@ -154,12 +157,24 @@ def _build_tools(blueprint: AgentBlueprint, tool_connections: dict[str, str] | N
                     server_label=mcp["server_label"],
                     server_url=mcp["server_url"],
                     require_approval=mcp.get("require_approval", "never"),
-                    allowed_tools=mcp.get("allowed_tools"),
+                    # The user's explicit, re-validated operation selection is
+                    # what the agent actually receives — this REPLACES any
+                    # static admin mcpallowedtools, it doesn't merge with it.
+                    # Requirement: "the agent receives only the operations
+                    # explicitly selected and approved by the user."
+                    allowed_tools=selection.operations,
                     project_connection_id=tool_connections.get(tool_id) or mcp.get("project_connection_id"),
                     headers=mcp.get("headers"),
                 )
             )
         elif tool_type == "openapi":
+            # OpenAPI tools predate per-operation MCP selection and expose
+            # their whole registered spec to Foundry — there is no
+            # per-operationId equivalent of MCP's allowed_tools in the
+            # OpenApiTool SDK surface used here. selection.operations for
+            # an OpenAPI server is carried for audit/policy visibility only
+            # (see blueprint_compiler._validate_tool_selections) and does
+            # not further restrict which operationIds Foundry can call.
             item = config.get("openapi")
             if not isinstance(item, dict):
                 raise ValueError(f"API Center tool '{tool_id}' did not resolve to a supported OpenAPI definition")

@@ -34,12 +34,22 @@ def to_foundry_agent_payload(
     tool_resources: Dict[str, Any] = {}
     tool_connections = tool_connections or {}
 
-    # Action tools pass through from the catalog as-is (already Foundry-shaped)
-    for tool_id in blueprint.tools:
-        tool = get_foundry_tool(tool_id)
-        conn_id = tool_connections.get(tool_id)
-        if conn_id and tool.get("type") == "mcp":
-            tool["mcp"]["project_connection_id"] = conn_id
+    # Action tools pass through from the catalog as-is (already Foundry-shaped),
+    # with the user's explicit per-operation selection applied to MCP servers
+    # so this preview matches exactly what create-test-agent will build
+    # (foundry_service.py::_build_tools) — never the admin's static
+    # mcpallowedtools, and never a shared mutable dict (get_foundry_tool()
+    # returns a cached object; copy before mutating so the Review page's
+    # preview request can't corrupt the next caller's cached tool).
+    for selection in blueprint.tools:
+        tool = dict(get_foundry_tool(selection.serverId))
+        conn_id = tool_connections.get(selection.serverId)
+        if tool.get("type") == "mcp":
+            mcp = dict(tool["mcp"])
+            mcp["allowed_tools"] = selection.operations
+            if conn_id:
+                mcp["project_connection_id"] = conn_id
+            tool["mcp"] = mcp
         tools.append(tool)
 
     # Knowledge sources resolve + merge into file_search / azure_ai_search tools

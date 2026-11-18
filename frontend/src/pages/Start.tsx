@@ -34,7 +34,7 @@ export default function Start() {
       status: "draft",
       coreDraft: draft!,
       knowledgeSourceIds: [],
-      toolIds: [],
+      toolSelections: [],
       audienceIds: [],
       behavior: { ...defaultBehavior, instructions: draft!.purpose },
       templateId: templateId ?? undefined,

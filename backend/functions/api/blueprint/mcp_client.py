@@ -23,12 +23,15 @@ def _post(
     url: str,
     payload: dict[str, Any],
     session_id: str | None = None,
+    auth_headers: dict[str, str] | None = None,
 ) -> requests.Response:
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
         "MCP-Protocol-Version": _PROTOCOL_VERSION,
     }
+    if auth_headers:
+        headers.update(auth_headers)
 
     if session_id:
         headers["Mcp-Session-Id"] = session_id
@@ -99,8 +102,19 @@ def _rpc_result(message: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def discover_tools(server_url: str) -> list[dict[str, Any]]:
-    """Initialize an MCP session and retrieve all tools, including paginated tools."""
+def discover_tools(
+    server_url: str,
+    auth_headers: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Initialize an MCP session and retrieve all tools, including paginated tools.
+
+    auth_headers are merged into every request to this server — e.g. the
+    admin's shared `x-functions-key` header (api_center_catalog.py) or the
+    headers built from a user's just-submitted connection values
+    (tool_connections.py) for an individually-authenticated server. Never
+    logged, never cached, never persisted by this module.
+    """
 
     initialize_response = _post(
         server_url,
@@ -117,6 +131,7 @@ def discover_tools(server_url: str) -> list[dict[str, Any]]:
                 },
             },
         },
+        auth_headers=auth_headers,
     )
 
     session_id = initialize_response.headers.get("Mcp-Session-Id")
@@ -134,6 +149,8 @@ def discover_tools(server_url: str) -> list[dict[str, Any]]:
     }
     if session_id:
         notification_headers["Mcp-Session-Id"] = session_id
+    if auth_headers:
+        notification_headers.update(auth_headers)
 
     notification = requests.post(
         server_url,
@@ -167,6 +184,7 @@ def discover_tools(server_url: str) -> list[dict[str, Any]]:
                 "params": params,
             },
             session_id=session_id,
+            auth_headers=auth_headers,
         )
 
         result = _rpc_result(_extract_message(response))
